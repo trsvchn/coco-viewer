@@ -31,6 +31,7 @@ class App(tk.Tk):
         self.load_image(self.current_image, start=True)
         self.bind("<Left>", self.previous_image)
         self.bind("<Right>", self.next_image)
+        # TODO: ADD exit button
 
     def anns_parser(self):
         """Parse annotations file"""
@@ -42,7 +43,7 @@ class App(tk.Tk):
         return iter(ImageList([(image['id'], image['file_name']) for image in instances['images']]))
 
     def load_image(self, image_name: tuple, start=False):
-        """Load image and represent it as label widget"""
+        """Loads image and represents it as label widget"""
 
         full_path = os.path.join(self.path_to_images, image_name[1])
 
@@ -115,6 +116,12 @@ class ImageList:
         return current_image
 
 
-if __name__ == "__main__":
+def main():
+    """Runs app"""
+    # TODO: add argparse
     app = App(TEST_IMAGES, TEST_ANNOTATIONS)
     app.mainloop()
+
+
+if __name__ == "__main__":
+    main()
