@@ -16,12 +16,14 @@ parser.add_argument('-a', '--annotations', default='', type=str, metavar='PATH',
 
 class App(tk.Tk):
     """Main App class.
+    # TODO: Implement predicted bboxes drawing (from custom models).
     """
     def __init__(self,
                  path_to_images: str,
                  path_to_gt_anns: str,
                  path_to_pred_anns: str = None) -> None:
         super().__init__()
+
         self.path_to_images = path_to_images
         self.path_to_gt_anns = path_to_gt_anns
         self.path_to_pred_anns = path_to_pred_anns
@@ -31,12 +33,12 @@ class App(tk.Tk):
 
         self.image_list = self.anns_parser()
 
-        self.current_image = self.image_list.next()
-        self.load_image(self.current_image, start=True)
+        self.current_image = self.image_list.next()  # set the first image as current
+        self.load_image(self.current_image, start=True)  # load first image
 
         self.bind("<Left>", self.previous_image)
         self.bind("<Right>", self.next_image)
-        # TODO: ADD exit button
+        # TODO: ADD exit button.
 
     def anns_parser(self):
         """Parse annotations file.
