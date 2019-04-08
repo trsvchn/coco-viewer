@@ -18,8 +18,9 @@ parser.add_argument('-a', '--annotations', default='', type=str, metavar='PATH',
 
 class App(tk.Tk):
     """Main App class.
-    # TODO: Implement predicted bboxes drawing (from custom models).
     """
+    # TODO: Implement predicted bboxes drawing (from custom models).
+    # TODO: ADD exit button.
     def __init__(self,
                  path_to_images: str,
                  path_to_gt_anns: str,
@@ -42,7 +43,6 @@ class App(tk.Tk):
 
         self.bind("<Left>", self.previous_image)
         self.bind("<Right>", self.next_image)
-        # TODO: ADD exit button.
 
     def load_annotations(self) -> dict:
         """Loads annotations file.
@@ -52,7 +52,6 @@ class App(tk.Tk):
 
         with open(self.path_to_gt_anns) as f:
             instances = json.load(f)
-
         return instances
 
     def get_images(self) -> list:
@@ -78,12 +77,12 @@ class App(tk.Tk):
 
         # Parse categories
         categories = list(zip([[category['id'], category['name']] for category in self.instances['categories']], colors))
-
         return dict([[cat[0][0], [cat[0][1], cat[1]]] for cat in categories])
 
     def load_image(self, image: tuple, start=False):
         """Loads image and represents it as label widget.
         """
+        # TODO: function is too long
         img_id, img_name = image
 
         full_path = os.path.join(self.path_to_images, img_name)
@@ -116,7 +115,7 @@ class App(tk.Tk):
             for c, m in zip(obj_categories, masks):
                 alpha = 75
                 fill = tuple(list(c[-1]) + [alpha])
-                # polygonal masks work fine
+                # Polygonal masks work fine
                 if isinstance(m, list):
                     draw.polygon(m[0], outline=fill, fill=fill)
                 # TODO: Fix problem with RLE
@@ -125,7 +124,7 @@ class App(tk.Tk):
                 else:
                     continue
 
-        # draw bboxes
+        # Draw bboxes
         for c, b in zip(obj_categories, bboxes):
             draw.rectangle(b, outline=c[-1])
 
@@ -134,10 +133,9 @@ class App(tk.Tk):
         composed_img = Image.alpha_composite(img_open, bbox_layer)
 
         if start:
-            # loading the very first image
+            # Loading the very first image
             img = ImageTk.PhotoImage(composed_img)
             self.image = tk.Label(self, image=img)
-            # self.image.image = img
             self.image.pack()
 
         img = ImageTk.PhotoImage(composed_img)
@@ -164,13 +162,12 @@ class App(tk.Tk):
 class ImageList:
     """Handles iterating through the images.
 
-       NOTE: image list are built based on annotations file, not image folder content!
+       NOTE: image list is based on annotations file, not image folder content!
     """
     def __init__(self, images):
         self.image_list = images
         self.n = -1
         self.max = len(images)
-        self.min = -2
 
     def next(self):
         """Sets the next image as current.
@@ -182,7 +179,6 @@ class ImageList:
         else:
             self.n = 0
             current_image = self.image_list[self.n]
-
         return current_image
 
     def prev(self):
@@ -194,12 +190,11 @@ class ImageList:
         else:
             self.n -= 1
             current_image = self.image_list[self.n]
-
         return current_image
 
 
 def main():
-    """Runs app.
+    """Runs the app.
     """
     args = parser.parse_args()
     app = App(args.images, args.annotations)
