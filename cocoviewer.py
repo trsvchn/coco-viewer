@@ -67,7 +67,9 @@ class App(tk.Tk):
     def load_image(self, image: tuple, start=False):
         """Loads image and represents it as label widget.
         """
-        full_path = os.path.join(self.path_to_images, image[1])
+        img_id, img_name = image
+
+        full_path = os.path.join(self.path_to_images, img_name)
 
         # Open image
         img_open = Image.open(full_path).convert('RGBA')
@@ -77,7 +79,21 @@ class App(tk.Tk):
         draw = ImageDraw.Draw(bbox_layer)
 
         # test bbox
-        draw.rectangle(xy=[300, 100, 500, 300], fill=(255, 0, 0, 80), outline=(255, 0, 0, 0))
+        #draw.rectangle(xy=[300, 100, 500, 300], fill=(255, 0, 0, 80), outline=(255, 0, 0, 0))
+
+        objects = self.get_objects(img_id)
+
+        # Extract bbox coordinates
+        bboxes = [[obj['bbox'][0],
+                   obj['bbox'][1],
+                   obj['bbox'][0] + obj['bbox'][2],
+                   obj['bbox'][1] + obj['bbox'][3]] for obj in objects]
+
+        # draw bboxes
+        for b in bboxes:
+            draw.rectangle(b, fill=(255, 0, 0, 80), outline=(255, 0, 0, 0))
+
+        del draw
 
         composed_img = Image.alpha_composite(img_open, bbox_layer)
 
