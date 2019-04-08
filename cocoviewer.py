@@ -28,20 +28,23 @@ class App(tk.Tk):
         self.path_to_gt_anns = path_to_gt_anns
         self.path_to_pred_anns = path_to_pred_anns
         self.image = None
+        self.instances = None
+        self.images = None
 
         self.print_debug()
 
-        self.image_list = self.anns_parser()
+        self.load_annotations()
+        self.get_images()
 
-        self.current_image = self.image_list.next()  # set the first image as current
+        self.current_image = self.images.next()  # set the first image as current
         self.load_image(self.current_image, start=True)  # load first image
 
         self.bind("<Left>", self.previous_image)
         self.bind("<Right>", self.next_image)
         # TODO: ADD exit button.
 
-    def anns_parser(self):
-        """Parse annotations file.
+    def load_annotations(self) -> None:
+        """Loads annotations file.
         """
         if '.json' in self.path_to_gt_anns:
             logging.info('Parsing json...')
@@ -49,12 +52,22 @@ class App(tk.Tk):
         with open(self.path_to_gt_anns) as f:
             instances = json.load(f)
 
-        return iter(ImageList([(image['id'], image['file_name']) for image in instances['images']]))
+        self.instances = instances
 
-    def load_image(self, image_name: tuple, start=False):
+    def get_images(self) -> None:
+        """Extracts all image ids and file names from annotations file.
+        """
+        self.images = ImageList([(image['id'], image['file_name']) for image in self.instances['images']])
+
+    def get_objects(self, image_id: int) -> list:
+        """Extracts all object from annotations file for image with image_id.
+        """
+        return [obj for obj in self.instances['annotations'] if obj['image_id'] == image_id]
+
+    def load_image(self, image: tuple, start=False):
         """Loads image and represents it as label widget.
         """
-        full_path = os.path.join(self.path_to_images, image_name[1])
+        full_path = os.path.join(self.path_to_images, image[1])
 
         # Open image
         img_open = Image.open(full_path).convert('RGBA')
@@ -86,51 +99,49 @@ class App(tk.Tk):
         """Loads the next image in a list.
         """
         if event:
-            self.load_image(self.image_list.next())
+            self.load_image(self.images.next())
 
     def previous_image(self, event):
         """Loads the previous image in a list.
         """
         if event:
-            self.load_image(self.image_list.prev())
+            self.load_image(self.images.prev())
 
 
 class ImageList:
     """Handles iterating through the images.
+
+       NOTE: image list are built based on annotations file, not image folder content!
     """
-    def __init__(self, image_list):
-        self.image_list = image_list
-        self.max = len(image_list)
-
-    def __iter__(self):
-        self.n = 0
-        return self
-
-    def __next__(self):
-        self.next()
+    def __init__(self, images):
+        self.image_list = images
+        self.n = -1
+        self.max = len(images)
+        self.min = -2
 
     def next(self):
-        """Sets the next image in the list as current.
+        """Sets the next image as current.
         """
+        self.n += 1
+
         if self.n < self.max:
             current_image = self.image_list[self.n]
-            self.n += 1
         else:
             self.n = 0
             current_image = self.image_list[self.n]
-            self.n += 1
+
         return current_image
 
     def prev(self):
-        """Sets the previous image in the list as current.
+        """Sets the previous image as current.
         """
-        if self.n > -1:
-            current_image = self.image_list[self.n]
-            self.n -= 1
-        else:
+        if self.n == 0:
             self.n = self.max - 1
             current_image = self.image_list[self.n]
+        else:
             self.n -= 1
+            current_image = self.image_list[self.n]
+
         return current_image
 
 
