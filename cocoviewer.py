@@ -1,8 +1,10 @@
 import argparse
 import os
+import random
+import colorsys
 import json
-import tkinter as tk
 import logging
+import tkinter as tk
 
 from PIL import Image, ImageDraw, ImageTk
 
@@ -28,13 +30,12 @@ class App(tk.Tk):
         self.path_to_gt_anns = path_to_gt_anns
         self.path_to_pred_anns = path_to_pred_anns
         self.image = None
-        self.instances = None
-        self.images = None
+
+        self.instances = self.load_annotations()
+        self.images = ImageList(self.get_images())
+        self.categories = self.get_categories()
 
         self.print_debug()
-
-        self.load_annotations()
-        self.get_images()
 
         self.current_image = self.images.next()  # set the first image as current
         self.load_image(self.current_image, start=True)  # load first image
@@ -43,7 +44,7 @@ class App(tk.Tk):
         self.bind("<Right>", self.next_image)
         # TODO: ADD exit button.
 
-    def load_annotations(self) -> None:
+    def load_annotations(self) -> dict:
         """Loads annotations file.
         """
         if '.json' in self.path_to_gt_anns:
@@ -52,17 +53,33 @@ class App(tk.Tk):
         with open(self.path_to_gt_anns) as f:
             instances = json.load(f)
 
-        self.instances = instances
+        return instances
 
-    def get_images(self) -> None:
+    def get_images(self) -> list:
         """Extracts all image ids and file names from annotations file.
         """
-        self.images = ImageList([(image['id'], image['file_name']) for image in self.instances['images']])
+        return [(image['id'], image['file_name']) for image in self.instances['images']]
 
     def get_objects(self, image_id: int) -> list:
         """Extracts all object from annotations file for image with image_id.
         """
         return [obj for obj in self.instances['annotations'] if obj['image_id'] == image_id]
+
+    def get_categories(self) -> dict:
+        """Extracts categories from annotations file and prepares color for each one.
+        """
+        # Get some colors
+        hsv_tuples = [(x / 80, 1., 1.) for x in range(80)]
+        colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
+        colors = list(map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)), colors))
+        random.seed(42)
+        random.shuffle(colors)
+        random.seed(None)
+
+        # Parse categories
+        categories = list(zip([[category['id'], category['name']] for category in self.instances['categories']], colors))
+
+        return dict([[cat[0][0], [cat[0][1], cat[1]]] for cat in categories])
 
     def load_image(self, image: tuple, start=False):
         """Loads image and represents it as label widget.
@@ -82,6 +99,7 @@ class App(tk.Tk):
         #draw.rectangle(xy=[300, 100, 500, 300], fill=(255, 0, 0, 80), outline=(255, 0, 0, 0))
 
         objects = self.get_objects(img_id)
+        obj_categories = [self.categories[obj['category_id']] for obj in objects]
 
         # Extract bbox coordinates
         bboxes = [[obj['bbox'][0],
@@ -90,8 +108,9 @@ class App(tk.Tk):
                    obj['bbox'][1] + obj['bbox'][3]] for obj in objects]
 
         # draw bboxes
-        for b in bboxes:
-            draw.rectangle(b, fill=(255, 0, 0, 80), outline=(255, 0, 0, 0))
+        for c, b in zip(obj_categories, bboxes):
+            print(c[-1])
+            draw.rectangle(b, outline=c[-1])
 
         del draw
 
@@ -105,6 +124,7 @@ class App(tk.Tk):
             self.image.pack()
 
         img = ImageTk.PhotoImage(composed_img)
+
         self.image.configure(image=img)
         self.image.image = img
 
