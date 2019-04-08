@@ -101,15 +101,32 @@ class App(tk.Tk):
         objects = self.get_objects(img_id)
         obj_categories = [self.categories[obj['category_id']] for obj in objects]
 
-        # Extract bbox coordinates
+        # Extracting bbox coordinates
         bboxes = [[obj['bbox'][0],
                    obj['bbox'][1],
                    obj['bbox'][0] + obj['bbox'][2],
                    obj['bbox'][1] + obj['bbox'][3]] for obj in objects]
 
+        # Extracting masks
+        masks = True
+        if masks:
+            masks = [obj['segmentation'] for obj in objects]
+
+            # draw masks
+            for c, m in zip(obj_categories, masks):
+                alpha = 75
+                fill = tuple(list(c[-1]) + [alpha])
+                # polygonal masks work fine
+                if isinstance(m, list):
+                    draw.polygon(m[0], outline=fill, fill=fill)
+                # TODO: Fix problem with RLE
+                # elif isinstance(m, dict):
+                #     draw.polygon(m['counts'][1:-2], outline=c[-1], fill=fill)
+                else:
+                    continue
+
         # draw bboxes
         for c, b in zip(obj_categories, bboxes):
-            print(c[-1])
             draw.rectangle(b, outline=c[-1])
 
         del draw
