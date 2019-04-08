@@ -13,9 +13,10 @@ parser = argparse.ArgumentParser(description='View images with bboxes from COCO 
 parser.add_argument('-i', '--images', default='', type=str, metavar='PATH', help='path to image folder')
 parser.add_argument('-a', '--annotations', default='', type=str, metavar='PATH', help='path to annotations json file')
 
-class App(tk.Tk):
-    """Main App class"""
 
+class App(tk.Tk):
+    """Main App class.
+    """
     def __init__(self,
                  path_to_images: str,
                  path_to_gt_anns: str,
@@ -38,17 +39,19 @@ class App(tk.Tk):
         # TODO: ADD exit button
 
     def anns_parser(self):
-        """Parse annotations file"""
-
+        """Parse annotations file.
+        """
         if '.json' in self.path_to_gt_anns:
             logging.info('Parsing json...')
+
         with open(self.path_to_gt_anns) as f:
             instances = json.load(f)
+
         return iter(ImageList([(image['id'], image['file_name']) for image in instances['images']]))
 
     def load_image(self, image_name: tuple, start=False):
-        """Loads image and represents it as label widget"""
-
+        """Loads image and represents it as label widget.
+        """
         full_path = os.path.join(self.path_to_images, image_name[1])
 
         # Open image
@@ -64,6 +67,7 @@ class App(tk.Tk):
         composed_img = Image.alpha_composite(img_open, bbox_layer)
 
         if start:
+            # loading the very first image
             img = ImageTk.PhotoImage(composed_img)
             self.image = tk.Label(self, image=img)
             # self.image.image = img
@@ -77,17 +81,21 @@ class App(tk.Tk):
         logging.info('Starting app...')
 
     def next_image(self, event):
+        """Loads the next image in a list.
+        """
         if event:
             self.load_image(self.image_list.next())
 
     def previous_image(self, event):
+        """Loads the previous image in a list.
+        """
         if event:
             self.load_image(self.image_list.prev())
 
 
 class ImageList:
-    """Handles iterating through the images."""
-
+    """Handles iterating through the images.
+    """
     def __init__(self, image_list):
         self.image_list = image_list
         self.max = len(image_list)
@@ -100,6 +108,8 @@ class ImageList:
         self.next()
 
     def next(self):
+        """Sets the next image in the list as current.
+        """
         if self.n < self.max:
             current_image = self.image_list[self.n]
             self.n += 1
@@ -110,6 +120,8 @@ class ImageList:
         return current_image
 
     def prev(self):
+        """Sets the previous image in the list as current.
+        """
         if self.n > -1:
             current_image = self.image_list[self.n]
             self.n -= 1
@@ -121,7 +133,8 @@ class ImageList:
 
 
 def main():
-    """Runs app"""
+    """Runs app.
+    """
     args = parser.parse_args()
     app = App(args.images, args.annotations)
     app.mainloop()
