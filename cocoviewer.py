@@ -4,7 +4,7 @@ import argparse
 from app import App
 
 parser = argparse.ArgumentParser(description='View images with bboxes from COCO dataset')
-parser.add_argument('-i', '--images', default='', type=str, metavar='PATH', help='path to image folder')
+parser.add_argument('-i', '--images', default='', type=str, metavar='PATH', help='path to images folder')
 parser.add_argument('-a', '--annotations', default='', type=str, metavar='PATH', help='path to annotations json file')
 
 
