@@ -36,10 +36,9 @@ python cocoviewer.py -i coco/images/val/val2017 -a coco/annotations/val/instance
 
 ## TODOs
 
-- Class labels
-- Predicted bboxes (to compare with ground truths)
-- More navigating options
-- Add export image option (with all bboex and masks)
-- RLE masks
-- Keypoints
-
+- [ ] Class labels
+- [ ] Predicted bboxes (to compare with ground truths)
+- [ ] More navigating options
+- [ ] Add export image option (with all bboex and masks)
+- [ ] RLE masks
+- [ ] Keypoints
