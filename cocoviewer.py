@@ -11,6 +11,7 @@ import colorsys
 import json
 import logging
 import tkinter as tk
+from tkinter.filedialog import asksaveasfile, asksaveasfilename
 
 from PIL import Image, ImageDraw, ImageTk
 
@@ -47,8 +48,9 @@ class App(tk.Tk):
         self.images = ImageList(self.get_images())  # NOTE: image list is based on annotations file
         self.categories = self.get_categories()
 
-        self.current_image = self.images.next()  # set the first image as current
-        self.load_image(self.current_image, start=True)  # load first image
+        self.current_image = self.images.next()  # Set the first image as current
+        self.composed_img = None  # To store composed PIL Image
+        self.init_image()
 
         self.bind("<Left>", self.previous_image)
         self.bind("<Right>", self.next_image)
@@ -103,8 +105,8 @@ class App(tk.Tk):
         categories = list(zip([[category['id'], category['name']] for category in self.instances['categories']], colors))
         return dict([[cat[0][0], [cat[0][1], cat[1]]] for cat in categories])
 
-    def load_image(self, image: tuple, start=False):
-        """Loads image and represents it as label widget.
+    def load_image(self, image: tuple):
+        """Loads image as PIL Image.
         """
         # TODO: function is too long
         img_id, img_name = image
@@ -154,33 +156,41 @@ class App(tk.Tk):
 
         del draw
 
-        composed_img = Image.alpha_composite(img_open, bbox_layer)
+        self.composed_img = Image.alpha_composite(img_open, bbox_layer)
 
-        if start:
-            # Loading the very first image
-            img = ImageTk.PhotoImage(composed_img)
-            self.image = tk.Label(self, image=img)
-            self.image.pack()
+    def init_image(self):
+        """Instantiates Image Label Widget.
+        """
+        # Loading the very first image
+        self.load_image(self.current_image)
+        img = ImageTk.PhotoImage(self.composed_img)
+        self.image = tk.Label(self, image=img)
+        self.image.pack()
+        self.image.image = img
 
-        img = ImageTk.PhotoImage(composed_img)
-
+    def update_image(self):
+        """Updates Image Label Widget.
+        """
+        img = ImageTk.PhotoImage(self.composed_img)
         self.image.configure(image=img)
         self.image.image = img
 
     def print_debug(self):
-        logging.info('Starting app...')
+        logging.info("Starting app...")
 
     def next_image(self, event):
         """Loads the next image in a list.
         """
         if event:
             self.load_image(self.images.next())
+            self.update_image()
 
     def previous_image(self, event):
         """Loads the previous image in a list.
         """
         if event:
             self.load_image(self.images.prev())
+            self.update_image()
 
 
 class ImageList:
