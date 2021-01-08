@@ -10,7 +10,7 @@
 ## Installation
 
 ```
-git clone https://github.com/trsvchn/local-coco-viewer.git
+git clone https://github.com/trsvchn/coco-viewer.git
 ```
 
 ## Usage
@@ -20,7 +20,7 @@ python cocoviewer.py -h
 
 usage: cocoviewer.py [-h] [-i PATH] [-a PATH]
 
-View images with bboxes from COCO dataset
+View images with bboxes from the COCO dataset
 
 optional arguments:
   -h, --help                    show this help message and exit
