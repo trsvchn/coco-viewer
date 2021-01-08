@@ -11,7 +11,7 @@ import colorsys
 import json
 import logging
 import tkinter as tk
-from tkinter.filedialog import asksaveasfile, asksaveasfilename
+from tkinter import filedialog
 
 from PIL import Image, ImageDraw, ImageTk
 
@@ -48,8 +48,10 @@ class App(tk.Tk):
         self.images = ImageList(self.get_images())  # NOTE: image list is based on annotations file
         self.categories = self.get_categories()
 
-        self.current_image = self.images.next()  # Set the first image as current
+        self.current_image = None
         self.composed_img = None  # To store composed PIL Image
+
+        # Init Image Widget
         self.init_image()
 
         self.bind("<Left>", self.previous_image)
@@ -60,7 +62,7 @@ class App(tk.Tk):
     def init_menu(self):
         menu_bar = tk.Menu(self, )
         file_menu = tk.Menu(menu_bar, tearoff=0)
-        file_menu.add_command(label="Save", command=lambda: None)  # TODO: Issue 1
+        file_menu.add_command(label="Save", command=self.save_image)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", accelerator="Ctrl+Q", command=self.destroy)
         menu_bar.add_cascade(label="File", menu=file_menu)
@@ -121,7 +123,7 @@ class App(tk.Tk):
         draw = ImageDraw.Draw(bbox_layer)
 
         # test bbox
-        #draw.rectangle(xy=[300, 100, 500, 300], fill=(255, 0, 0, 80), outline=(255, 0, 0, 0))
+        # draw.rectangle(xy=[300, 100, 500, 300], fill=(255, 0, 0, 80), outline=(255, 0, 0, 0))
 
         objects = self.get_objects(img_id)
         obj_categories = [self.categories[obj['category_id']] for obj in objects]
@@ -158,12 +160,35 @@ class App(tk.Tk):
 
         self.composed_img = Image.alpha_composite(img_open, bbox_layer)
 
+    def save_image(self):
+        """Saves composed image as png file.
+        """
+        # Initial (original) file name
+        initialfile = self.current_image[-1].split(".")[0]
+        # TODO: Add more formats, at least jpg (RGBA -> RGB)?
+        filetypes = (("png files", "*.png"), ("all files", "*.*"))
+        # By default save as png file
+        defaultextension = ".png"
+
+        file = filedialog.asksaveasfilename(
+            initialfile=initialfile,
+            filetypes=filetypes,
+            defaultextension=defaultextension,
+        )
+
+        # If not canceled
+        if file:
+            self.composed_img.save(file)
+
     def init_image(self):
         """Instantiates Image Label Widget.
         """
-        # Loading the very first image
+        # Set the first image as current
+        self.current_image = self.images.next()
+        # Load the very first image
         self.load_image(self.current_image)
         img = ImageTk.PhotoImage(self.composed_img)
+        # Init the image widget
         self.image = tk.Label(self, image=img)
         self.image.pack()
         self.image.image = img
@@ -172,6 +197,7 @@ class App(tk.Tk):
         """Updates Image Label Widget.
         """
         img = ImageTk.PhotoImage(self.composed_img)
+        # Update the image widget
         self.image.configure(image=img)
         self.image.image = img
 
@@ -182,14 +208,16 @@ class App(tk.Tk):
         """Loads the next image in a list.
         """
         if event:
-            self.load_image(self.images.next())
+            self.current_image = self.images.next()
+            self.load_image(self.current_image)
             self.update_image()
 
     def previous_image(self, event):
         """Loads the previous image in a list.
         """
         if event:
-            self.load_image(self.images.prev())
+            self.current_image = self.images.prev()
+            self.load_image(self.current_image)
             self.update_image()
 
 
