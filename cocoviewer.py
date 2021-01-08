@@ -53,16 +53,22 @@ class App(tk.Tk):
 
         # Init Image Widget
         self.init_image()
+        # Bind events, shortcuts
+        self.bind_events()
 
+    def bind_events(self):
         self.bind("<Left>", self.previous_image)
+        self.bind("<k>", self.previous_image)
         self.bind("<Right>", self.next_image)
+        self.bind("<j>", self.next_image)
         self.bind("<Control-q>", self.exit)
         self.bind("<Control-w>", self.exit)
+        self.bind("<Control-s>", self.save_image)
 
     def init_menu(self):
         menu_bar = tk.Menu(self, )
         file_menu = tk.Menu(menu_bar, tearoff=0)
-        file_menu.add_command(label="Save", command=self.save_image)
+        file_menu.add_command(label="Save", accelerator="Ctrl+S", command=self.save_image)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", accelerator="Ctrl+Q", command=self.destroy)
         menu_bar.add_cascade(label="File", menu=file_menu)
@@ -160,7 +166,7 @@ class App(tk.Tk):
 
         self.composed_img = Image.alpha_composite(img_open, bbox_layer)
 
-    def save_image(self):
+    def save_image(self, event=None):
         """Saves composed image as png file.
         """
         # Initial (original) file name
