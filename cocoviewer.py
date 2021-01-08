@@ -27,12 +27,16 @@ class App(tk.Tk):
     """
     # TODO: labels for classes
     # TODO: predicted bboxes drawing (from custom models).
-    # TODO: ADD exit button.
     def __init__(self,
                  path_to_images: str,
                  path_to_gt_anns: str,
                  path_to_pred_anns: str = None) -> None:
         super().__init__()
+        # for the debugging
+        self.print_debug()
+
+        self.title("COCO Viewer")
+        self.init_menu()
 
         self.path_to_images = path_to_images
         self.path_to_gt_anns = path_to_gt_anns
@@ -43,13 +47,26 @@ class App(tk.Tk):
         self.images = ImageList(self.get_images())  # NOTE: image list is based on annotations file
         self.categories = self.get_categories()
 
-        self.print_debug()
-
         self.current_image = self.images.next()  # set the first image as current
         self.load_image(self.current_image, start=True)  # load first image
 
         self.bind("<Left>", self.previous_image)
         self.bind("<Right>", self.next_image)
+        self.bind("<Control-q>", self.exit)
+        self.bind("<Control-w>", self.exit)
+
+    def init_menu(self):
+        menu_bar = tk.Menu(self, )
+        file_menu = tk.Menu(menu_bar, tearoff=0)
+        file_menu.add_command(label="Save", command=lambda: None)  # TODO: Issue 1
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", accelerator="Ctrl+Q", command=self.destroy)
+        menu_bar.add_cascade(label="File", menu=file_menu)
+        self.config(menu=menu_bar)
+
+    def exit(self, event):
+        if event:
+            self.destroy()
 
     def load_annotations(self) -> dict:
         """Loads annotations file.
