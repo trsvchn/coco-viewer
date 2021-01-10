@@ -10,7 +10,7 @@ import colorsys
 import json
 import logging
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 
 from PIL import Image, ImageDraw, ImageTk
 
@@ -250,6 +250,10 @@ def main():
     args = parser.parse_args()
     root = tk.Tk()
     root.title("COCO Viewer")
+
+    if not args.images or not args.annotations:
+        messagebox.showwarning("Warning!", "Nothing to show.\nPlease specify path to coco dataset!")
+
     image = ImageWidget(root, args.images, args.annotations)
     menu(root, image)
     bind_events(root, image)
