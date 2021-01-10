@@ -29,6 +29,10 @@ class ImageWidget:
     def __init__(self, parent, image_dir=None, annotations_file=None) -> None:
         self.parent = parent
         self.image = tk.Label(self.parent)
+        self.bboxes_on = tk.BooleanVar()
+        self.bboxes_on.set(True)
+        self.masks_on = tk.BooleanVar()
+        self.masks_on.set(True)
 
         if image_dir and annotations_file:
             self.image_dir = image_dir
@@ -38,8 +42,8 @@ class ImageWidget:
             self.categories = categories
             self.current_image = self.images.next()  # Set the first image as current
             self.composed_img = None  # To store composed PIL Image
-            # Load the very first image
-            self.load_image(self.current_image)
+            # Load and prepare the very first image
+            self.compose_current_image()
             img = ImageTk.PhotoImage(self.composed_img)
             # Init the image widget
             self.image.config(image=img)
@@ -48,40 +52,24 @@ class ImageWidget:
         else:
             self.image.pack()
 
-    def exit(self, event):
-        if event:
-            self.parent.destroy()
-
-    def load_image(self, image: tuple):
-        """Loads image as PIL Image.
+    def compose_image(self, image: tuple):
+        """Loads image as PIL Image and draw bboxes and/or masks.
         """
         # TODO: function is too long
         img_id, img_name = image
         full_path = os.path.join(self.image_dir, img_name)
         # Open image
         img_open = Image.open(full_path).convert("RGBA")
-        # Create layer for bbox
-        bbox_layer = Image.new("RGBA", img_open.size, (255, 255, 255, 0))
-        draw = ImageDraw.Draw(bbox_layer)
-
-        # test bbox
-        # draw.rectangle(xy=[300, 100, 500, 300], fill=(255, 0, 0, 80), outline=(255, 0, 0, 0))
-
+        # Create layer for bboxes and masks
+        draw_layer = Image.new("RGBA", img_open.size, (255, 255, 255, 0))
+        draw = ImageDraw.Draw(draw_layer)
         # Get objects
         objects = [obj for obj in self.instances["annotations"] if obj["image_id"] == img_id]
         obj_categories = [self.categories[obj["category_id"]] for obj in objects]
 
-        # Extracting bbox coordinates
-        bboxes = [[obj["bbox"][0],
-                   obj["bbox"][1],
-                   obj["bbox"][0] + obj["bbox"][2],
-                   obj["bbox"][1] + obj["bbox"][3]] for obj in objects]
-
-        # Extracting masks
-        masks = True
-        if masks:
+        # Prepare masks
+        if self.masks_on.get():
             masks = [obj["segmentation"] for obj in objects]
-
             # draw masks
             for c, m in zip(obj_categories, masks):
                 alpha = 75
@@ -95,13 +83,55 @@ class ImageWidget:
                 else:
                     continue
 
-        # Draw bboxes
-        for c, b in zip(obj_categories, bboxes):
-            draw.rectangle(b, outline=c[-1])
+        # Draw bounding boxes
+        if self.bboxes_on.get():
+            # Extracting bbox coordinates
+            bboxes = [[obj["bbox"][0],
+                       obj["bbox"][1],
+                       obj["bbox"][0] + obj["bbox"][2],
+                       obj["bbox"][1] + obj["bbox"][3]] for obj in objects]
+            # Draw bboxes
+            for c, b in zip(obj_categories, bboxes):
+                draw.rectangle(b, outline=c[-1])
 
         del draw
+        # Set composed image
+        self.composed_img = Image.alpha_composite(img_open, draw_layer)
 
-        self.composed_img = Image.alpha_composite(img_open, bbox_layer)
+    def update_image(self):
+        """Updates Image Label Widget.
+        """
+        img = ImageTk.PhotoImage(self.composed_img)
+        # Update the image widget
+        self.image.configure(image=img)
+        self.image.image = img
+
+    def compose_current_image(self):
+        self.compose_image(self.current_image)
+
+    def update_current_image(self):
+        """Loads the previous image in a list.
+        """
+        self.compose_current_image()
+        self.update_image()
+
+############################################
+# EVENTS
+############################################
+
+    def next_image(self, event):
+        """Loads the next image in a list.
+        """
+        if event:
+            self.current_image = self.images.next()
+            self.update_current_image()
+
+    def previous_image(self, event):
+        """Loads the previous image in a list.
+        """
+        if event:
+            self.current_image = self.images.prev()
+            self.update_current_image()
 
     def save_image(self, event=None):
         """Saves composed image as png file.
@@ -122,29 +152,81 @@ class ImageWidget:
         if file:
             self.composed_img.save(file)
 
-    def update_image(self):
-        """Updates Image Label Widget.
-        """
-        img = ImageTk.PhotoImage(self.composed_img)
-        # Update the image widget
-        self.image.configure(image=img)
-        self.image.image = img
+    def exit(self, event=None):
+        self.parent.destroy()
 
-    def next_image(self, event):
-        """Loads the next image in a list.
-        """
-        if event:
-            self.current_image = self.images.next()
-            self.load_image(self.current_image)
-            self.update_image()
 
-    def previous_image(self, event):
-        """Loads the previous image in a list.
+def bind_events(root, image):
+    """Binds events.
+    """
+    root.bind("<Left>", image.previous_image)
+    root.bind("<k>", image.previous_image)
+    root.bind("<Right>", image.next_image)
+    root.bind("<j>", image.next_image)
+    root.bind("<Control-q>", image.exit)
+    root.bind("<Control-w>", image.exit)
+    root.bind("<Control-s>", image.save_image)
+
+
+def menu(root, image):
+    """Adds a Menu bar.
+    """
+    menu_bar = tk.Menu(root)
+    file_menu = tk.Menu(menu_bar, tearoff=0)
+    file_menu.add_command(label="Save", accelerator="Ctrl+S", command=image.save_image)
+    file_menu.add_separator()
+    file_menu.add_command(label="Exit", accelerator="Ctrl+Q", command=root.destroy)
+    menu_bar.add_cascade(label="File", menu=file_menu)
+
+    view_menu = tk.Menu(menu_bar, tearoff=0)
+    view_menu.add_checkbutton(
+        label="BBoxes",
+        onvalue=True,
+        offvalue=False,
+        variable=image.bboxes_on,
+        command=image.update_current_image,
+    )
+    view_menu.add_checkbutton(
+        label="Masks",
+        onvalue=True,
+        offvalue=False,
+        variable=image.masks_on,
+        command=image.update_current_image,
+    )
+    menu_bar.add_cascade(label="View", menu=view_menu)
+    root.config(menu=menu_bar)
+
+
+class ImageList:
+    """Handles iterating through the images.
+    """
+    def __init__(self, images: list):
+        self.image_list = images or []
+        self.n = -1
+        self.max = len(self.image_list)
+
+    def next(self):
+        """Sets the next image as current.
         """
-        if event:
-            self.current_image = self.images.prev()
-            self.load_image(self.current_image)
-            self.update_image()
+        self.n += 1
+
+        if self.n < self.max:
+            current_image = self.image_list[self.n]
+        else:
+            self.n = 0
+            current_image = self.image_list[self.n]
+        return current_image
+
+    def prev(self):
+        """Sets the previous image as current.
+        """
+        if self.n == 0:
+            self.n = self.max - 1
+            current_image = self.image_list[self.n]
+        else:
+            self.n -= 1
+            current_image = self.image_list[self.n]
+        return current_image
 
 
 def parse_coco(annotations_file: str) -> tuple:
@@ -182,68 +264,10 @@ def get_categories(instances: dict) -> dict:
     random.seed(42)
     random.shuffle(colors)
     random.seed(None)
-
     # Parse categories
     categories = list(zip([[category["id"], category["name"]] for category in instances["categories"]], colors))
     categories = dict([[cat[0][0], [cat[0][1], cat[1]]] for cat in categories])
     return categories
-
-
-def menu(root, image):
-    """Adds a Menu bar.
-    """
-    menu_bar = tk.Menu(root)
-    file_menu = tk.Menu(menu_bar, tearoff=0)
-    file_menu.add_command(label="Save", accelerator="Ctrl+S", command=image.save_image)
-
-    file_menu.add_separator()
-    file_menu.add_command(label="Exit", accelerator="Ctrl+Q", command=root.destroy)
-    menu_bar.add_cascade(label="File", menu=file_menu)
-    root.config(menu=menu_bar)
-
-
-def bind_events(root, image):
-    """Binds events.
-    """
-    root.bind("<Left>", image.previous_image)
-    root.bind("<k>", image.previous_image)
-    root.bind("<Right>", image.next_image)
-    root.bind("<j>", image.next_image)
-    root.bind("<Control-q>", image.exit)
-    root.bind("<Control-w>", image.exit)
-    root.bind("<Control-s>", image.save_image)
-
-
-class ImageList:
-    """Handles iterating through the images.
-    """
-    def __init__(self, images: list):
-        self.image_list = images or []
-        self.n = -1
-        self.max = len(self.image_list)
-
-    def next(self):
-        """Sets the next image as current.
-        """
-        self.n += 1
-
-        if self.n < self.max:
-            current_image = self.image_list[self.n]
-        else:
-            self.n = 0
-            current_image = self.image_list[self.n]
-        return current_image
-
-    def prev(self):
-        """Sets the previous image as current.
-        """
-        if self.n == 0:
-            self.n = self.max - 1
-            current_image = self.image_list[self.n]
-        else:
-            self.n -= 1
-            current_image = self.image_list[self.n]
-        return current_image
 
 
 def print_info(message: str):
