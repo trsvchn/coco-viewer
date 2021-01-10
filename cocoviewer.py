@@ -155,6 +155,16 @@ class ImageWidget:
     def exit(self, event=None):
         self.parent.destroy()
 
+    def toggle_bboxes(self, event=None):
+        if event:
+            self.bboxes_on.set(not self.bboxes_on.get())
+            self.update_current_image()
+
+    def toggle_masks(self, event=None):
+        if event:
+            self.masks_on.set(not self.masks_on.get())
+            self.update_current_image()
+
 
 def bind_events(root, image):
     """Binds events.
@@ -166,6 +176,10 @@ def bind_events(root, image):
     root.bind("<Control-q>", image.exit)
     root.bind("<Control-w>", image.exit)
     root.bind("<Control-s>", image.save_image)
+    root.bind("<b>", image.toggle_bboxes)
+    root.bind("<Control-b>", image.toggle_bboxes)
+    root.bind("<m>", image.toggle_masks)
+    root.bind("<Control-m>", image.toggle_masks)
 
 
 def menu(root, image):
