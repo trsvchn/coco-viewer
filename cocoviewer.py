@@ -26,22 +26,27 @@ class ImageWidget:
     """
     # TODO: labels for object classes
     # TODO: predicted bboxes drawing (from models)
-    def __init__(self, parent, image_dir, annotations_file) -> None:
+    def __init__(self, parent, image_dir=None, annotations_file=None) -> None:
         self.parent = parent
-        self.image_dir = image_dir
-        instances, images, categories = parse_coco(annotations_file)
-        self.instances = instances
-        self.images = ImageList(images)  # NOTE: image list is based on annotations file
-        self.categories = categories
-        self.current_image = self.images.next()  # Set the first image as current
-        self.composed_img = None  # To store composed PIL Image
-        # Load the very first image
-        self.load_image(self.current_image)
-        img = ImageTk.PhotoImage(self.composed_img)
-        # Init the image widget
-        self.image = tk.Label(self.parent, image=img)
-        self.image.pack()
-        self.image.image = img
+        self.image = tk.Label(self.parent)
+
+        if image_dir and annotations_file:
+            self.image_dir = image_dir
+            instances, images, categories = parse_coco(annotations_file)
+            self.instances = instances
+            self.images = ImageList(images)  # NOTE: image list is based on annotations file
+            self.categories = categories
+            self.current_image = self.images.next()  # Set the first image as current
+            self.composed_img = None  # To store composed PIL Image
+            # Load the very first image
+            self.load_image(self.current_image)
+            img = ImageTk.PhotoImage(self.composed_img)
+            # Init the image widget
+            self.image.config(image=img)
+            self.image.pack()
+            self.image.image = img
+        else:
+            self.image.pack()
 
     def exit(self, event):
         if event:
@@ -252,7 +257,8 @@ def main():
     root.title("COCO Viewer")
 
     if not args.images or not args.annotations:
-        messagebox.showwarning("Warning!", "Nothing to show.\nPlease specify path to coco dataset!")
+        root.geometry("300x150")  # app size when no data is provided
+        messagebox.showwarning("Warning!", "Nothing to show.\nPlease specify a path to the COCO dataset!")
 
     image = ImageWidget(root, args.images, args.annotations)
     menu(root, image)
