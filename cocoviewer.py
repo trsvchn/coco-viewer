@@ -188,6 +188,15 @@ class ImageWidget:
             self.masks_on.set(not self.masks_on.get())
             self.update_current_image()
 
+    def toggle_all(self, event=None):
+        if event:
+            var_list = [self.bboxes_on, self.masks_on]
+            if True in set([var.get() for var in var_list]):
+                [var.set(False) for var in var_list]
+            else:
+                [var.set(True) for var in var_list]
+            self.update_current_image()
+
 
 def bind_events(root, image):
     """Binds events.
@@ -203,6 +212,7 @@ def bind_events(root, image):
     root.bind("<Control-b>", image.toggle_bboxes)
     root.bind("<m>", image.toggle_masks)
     root.bind("<Control-m>", image.toggle_masks)
+    root.bind("<space>", image.toggle_all)
 
 
 def menu(root, image):
