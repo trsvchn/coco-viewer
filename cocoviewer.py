@@ -283,6 +283,8 @@ def main():
     if not args.images or not args.annotations:
         root.geometry("300x150")  # app size when no data is provided
         messagebox.showwarning("Warning!", "Nothing to show.\nPlease specify a path to the COCO dataset!")
+        root.destroy()
+        return
 
     image = ImageWidget(root, args.images, args.annotations)
     menu(root, image)
