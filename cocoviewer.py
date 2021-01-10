@@ -29,6 +29,15 @@ class ImageWidget:
     def __init__(self, parent, image_dir=None, annotations_file=None) -> None:
         self.parent = parent
         self.image = tk.Label(self.parent)
+        self.status = tk.StringVar()
+        self.statusbar = tk.Label(
+            self.parent,
+            text="TEST",
+            textvariable=self.status,
+            anchor=tk.W,
+            bd=2,
+            bg="gray75",
+        )
         self.bboxes_on = tk.BooleanVar()
         self.bboxes_on.set(True)
         self.masks_on = tk.BooleanVar()
@@ -47,10 +56,15 @@ class ImageWidget:
             img = ImageTk.PhotoImage(self.composed_img)
             # Init the image widget
             self.image.config(image=img)
-            self.image.pack()
+            self.image.pack(side=tk.TOP)
+            self.statusbar.pack(side=tk.BOTTOM, fill=tk.X)
             self.image.image = img
         else:
-            self.image.pack()
+            self.image.pack(side=tk.TOP)
+            self.statusbar.pack(side=tk.BOTTOM, fill=tk.X)
+
+        self.nobjects = None
+        self.ncategories = None
 
     def compose_image(self, image: tuple):
         """Loads image as PIL Image and draw bboxes and/or masks.
@@ -66,6 +80,9 @@ class ImageWidget:
         # Get objects
         objects = [obj for obj in self.instances["annotations"] if obj["image_id"] == img_id]
         obj_categories = [self.categories[obj["category_id"]] for obj in objects]
+
+        self.nobjects = len(objects)
+        self.ncategories = len(set([obj["category_id"] for obj in objects]))
 
         # Prepare masks
         if self.masks_on.get():
@@ -108,6 +125,11 @@ class ImageWidget:
 
     def compose_current_image(self):
         self.compose_image(self.current_image)
+        self.status.set(f"{str(self.images.n + 1)}/{self.images.max} | "
+                        f"{self.current_image[-1]} | "
+                        f"objects: {self.nobjects} | "
+                        f"categories: {self.ncategories}"
+                        )
 
     def update_current_image(self):
         """Loads the previous image in a list.
@@ -154,6 +176,7 @@ class ImageWidget:
 
     def exit(self, event=None):
         self.parent.destroy()
+        print_info("Exiting...")
 
     def toggle_bboxes(self, event=None):
         if event:
@@ -298,6 +321,7 @@ def main():
         root.geometry("300x150")  # app size when no data is provided
         messagebox.showwarning("Warning!", "Nothing to show.\nPlease specify a path to the COCO dataset!")
         root.destroy()
+        print_info("Exiting...")
         return
 
     image = ImageWidget(root, args.images, args.annotations)
