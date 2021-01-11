@@ -199,13 +199,18 @@ class ImageWidget(tk.Frame):
         self.image = tk.Label(self)
         self.image.pack(side=tk.TOP)
 
-        self.statusbar = tk.Label(
-            parent,
-            anchor=tk.W,
-            bd=2,
-            bg="gray75",
-        )
+        self.statusbar = tk.Frame(parent, bg="gray75")
         self.statusbar.pack(side=tk.BOTTOM, fill=tk.X)
+        self.file_count = tk.Label(self.statusbar, bd=5, bg="gray75")
+        self.file_count.pack(side=tk.RIGHT)
+        self.description = tk.Label(self.statusbar, bd=5, bg="gray75")
+        self.description.pack(side=tk.RIGHT)
+        self.file_name = tk.Label(self.statusbar, bd=5, bg="gray75")
+        self.file_name.pack(side=tk.LEFT)
+        self.nobjects = tk.Label(self.statusbar, bd=5, bg="gray75")
+        self.nobjects.pack(side=tk.LEFT)
+        self.ncategories = tk.Label(self.statusbar, bd=5, bg="gray75")
+        self.ncategories.pack(side=tk.LEFT)
 
 
 class Controller:
@@ -214,8 +219,16 @@ class Controller:
         self.image = image
         self.data = data
 
-        self.status = tk.StringVar()
-        self.image.statusbar.configure(textvariable=self.status)
+        self.file_count_status = tk.StringVar()
+        self.file_name_status = tk.StringVar()
+        self.description_status = tk.StringVar()
+        self.nobjects_status = tk.StringVar()
+        self.ncategories_status = tk.StringVar()
+        self.image.file_count.configure(textvariable=self.file_count_status)
+        self.image.file_name.configure(textvariable=self.file_name_status)
+        self.image.description.configure(textvariable=self.description_status)
+        self.image.nobjects.configure(textvariable=self.nobjects_status)
+        self.image.ncategories.configure(textvariable=self.ncategories_status)
 
         self.bboxes_on = tk.BooleanVar()
         self.bboxes_on.set(True)
@@ -231,11 +244,11 @@ class Controller:
         img = ImageTk.PhotoImage(img)
         self.image.image.configure(image=img)
         self.image.image.image = img
-        self.status.set(f"{str(self.data.images.n + 1)}/{self.data.images.max} | "
-                        f"{self.data.current_image[-1]} | "
-                        f"objects: {self.data.nobjects} | "
-                        f"categories: {self.data.ncategories}"
-                        )
+        self.file_count_status.set(f"{str(self.data.images.n + 1)}/{self.data.images.max}")
+        self.file_name_status.set(f"{self.data.current_image[-1]}")
+        self.description_status.set(f"{self.data.instances.get('info', '').get('description', '')}")
+        self.nobjects_status.set(f"objects: {self.data.nobjects}")
+        self.ncategories_status.set(f"categories: {self.data.ncategories}")
 
     def exit(self, event=None):
         print_info("Exiting...")
