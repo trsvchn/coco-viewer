@@ -21,55 +21,56 @@ parser.add_argument("-i", "--images", default='', type=str, metavar="PATH", help
 parser.add_argument("-a", "--annotations", default='', type=str, metavar="PATH", help="path to annotations json file")
 
 
-class ImageWidget:
+class ImageWidget(tk.Frame):
     """Main Image Widget that displays composed image.
     """
     # TODO: labels for object classes
     # TODO: predicted bboxes drawing (from models)
-    def __init__(self, parent, image_dir=None, annotations_file=None) -> None:
-        self.parent = parent
-        self.image = tk.Label(self.parent)
+    def __init__(self, parent, image_dir, annotations_file):
+        super().__init__(parent)
+        self.pack()
+
+        self.image = tk.Label(self)
+        self.image.pack(side=tk.TOP)
+
         self.status = tk.StringVar()
         self.statusbar = tk.Label(
-            self.parent,
+            parent,
             text="TEST",
             textvariable=self.status,
             anchor=tk.W,
             bd=2,
             bg="gray75",
         )
+        self.statusbar.pack(side=tk.BOTTOM, fill=tk.X)
+
         self.bboxes_on = tk.BooleanVar()
         self.bboxes_on.set(True)
         self.masks_on = tk.BooleanVar()
         self.masks_on.set(True)
 
-        if image_dir and annotations_file:
-            self.image_dir = image_dir
-            instances, images, categories = parse_coco(annotations_file)
-            self.instances = instances
-            self.images = ImageList(images)  # NOTE: image list is based on annotations file
-            self.categories = categories
-            self.current_image = self.images.next()  # Set the first image as current
-            self.composed_img = None  # To store composed PIL Image
-            # Load and prepare the very first image
-            self.compose_current_image()
-            img = ImageTk.PhotoImage(self.composed_img)
-            # Init the image widget
-            self.image.config(image=img)
-            self.image.pack(side=tk.TOP)
-            self.statusbar.pack(side=tk.BOTTOM, fill=tk.X)
-            self.image.image = img
-        else:
-            self.image.pack(side=tk.TOP)
-            self.statusbar.pack(side=tk.BOTTOM, fill=tk.X)
-
         self.nobjects = None
         self.ncategories = None
+
+        self.image_dir = image_dir
+        instances, images, categories = parse_coco(annotations_file)
+        self.instances = instances
+        self.images = ImageList(images)  # NOTE: image list is based on annotations file
+        self.categories = categories
+        self.current_image = self.images.next()  # Set the first image as current
+        self.composed_img = None  # To store composed PIL Image
+        # Load and prepare the very first image
+        self.compose_current_image()
+        img = ImageTk.PhotoImage(self.composed_img)
+        # Init the image widget
+        self.image.config(image=img)
+        self.image.image = img
+
+        self.bind_events()
 
     def compose_image(self, image: tuple):
         """Loads image as PIL Image and draw bboxes and/or masks.
         """
-        # TODO: function is too long
         img_id, img_name = image
         full_path = os.path.join(self.image_dir, img_name)
         # Open image
@@ -86,33 +87,14 @@ class ImageWidget:
 
         # Prepare masks
         if self.masks_on.get():
-            masks = [obj["segmentation"] for obj in objects]
-            # draw masks
-            for c, m in zip(obj_categories, masks):
-                alpha = 75
-                fill = tuple(list(c[-1]) + [alpha])
-                # Polygonal masks work fine
-                if isinstance(m, list):
-                    draw.polygon(m[0], outline=fill, fill=fill)
-                # TODO: Fix problem with RLE
-                # elif isinstance(m, dict):
-                #     draw.polygon(m['counts'][1:-2], outline=c[-1], fill=fill)
-                else:
-                    continue
+            draw_masks(draw, objects, obj_categories)
 
         # Draw bounding boxes
         if self.bboxes_on.get():
-            # Extracting bbox coordinates
-            bboxes = [[obj["bbox"][0],
-                       obj["bbox"][1],
-                       obj["bbox"][0] + obj["bbox"][2],
-                       obj["bbox"][1] + obj["bbox"][3]] for obj in objects]
-            # Draw bboxes
-            for c, b in zip(obj_categories, bboxes):
-                draw.rectangle(b, outline=c[-1])
+            draw_bboxes(draw, objects, obj_categories)
 
         del draw
-        # Set composed image
+        # Set composed resulting image
         self.composed_img = Image.alpha_composite(img_open, draw_layer)
 
     def update_image(self):
@@ -137,23 +119,21 @@ class ImageWidget:
         self.compose_current_image()
         self.update_image()
 
-############################################
+###############################################################################
 # EVENTS
-############################################
+###############################################################################
 
     def next_image(self, event):
         """Loads the next image in a list.
         """
-        if event:
-            self.current_image = self.images.next()
-            self.update_current_image()
+        self.current_image = self.images.next()
+        self.update_current_image()
 
     def previous_image(self, event):
         """Loads the previous image in a list.
         """
-        if event:
-            self.current_image = self.images.prev()
-            self.update_current_image()
+        self.current_image = self.images.prev()
+        self.update_current_image()
 
     def save_image(self, event=None):
         """Saves composed image as png file.
@@ -175,73 +155,77 @@ class ImageWidget:
             self.composed_img.save(file)
 
     def exit(self, event=None):
-        self.parent.destroy()
         print_info("Exiting...")
+        self.quit()
 
     def toggle_bboxes(self, event=None):
-        if event:
-            self.bboxes_on.set(not self.bboxes_on.get())
-            self.update_current_image()
+        self.bboxes_on.set(not self.bboxes_on.get())
+        self.update_current_image()
 
     def toggle_masks(self, event=None):
-        if event:
-            self.masks_on.set(not self.masks_on.get())
-            self.update_current_image()
+        self.masks_on.set(not self.masks_on.get())
+        self.update_current_image()
 
-    def toggle_all(self, event=None):
-        if event:
-            var_list = [self.bboxes_on, self.masks_on]
-            if True in set([var.get() for var in var_list]):
-                [var.set(False) for var in var_list]
-            else:
-                [var.set(True) for var in var_list]
-            self.update_current_image()
+    def toggle_all(self, event):
+        var_list = [self.bboxes_on, self.masks_on]
+        if True in set([var.get() for var in var_list]):
+            [var.set(False) for var in var_list]
+        else:
+            [var.set(True) for var in var_list]
+        self.update_current_image()
 
-
-def bind_events(root, image):
-    """Binds events.
-    """
-    root.bind("<Left>", image.previous_image)
-    root.bind("<k>", image.previous_image)
-    root.bind("<Right>", image.next_image)
-    root.bind("<j>", image.next_image)
-    root.bind("<Control-q>", image.exit)
-    root.bind("<Control-w>", image.exit)
-    root.bind("<Control-s>", image.save_image)
-    root.bind("<b>", image.toggle_bboxes)
-    root.bind("<Control-b>", image.toggle_bboxes)
-    root.bind("<m>", image.toggle_masks)
-    root.bind("<Control-m>", image.toggle_masks)
-    root.bind("<space>", image.toggle_all)
+    def bind_events(self):
+        """Binds events.
+        """
+        self._root().bind("<Left>", self.previous_image)
+        self._root().bind("<k>", self.previous_image)
+        self._root().bind("<Right>", self.next_image)
+        self._root().bind("<j>", self.next_image)
+        self._root().bind("<Control-q>", self.exit)
+        self._root().bind("<Control-w>", self.exit)
+        self._root().bind("<Control-s>", self.save_image)
+        self._root().bind("<b>", self.toggle_bboxes)
+        self._root().bind("<Control-b>", self.toggle_bboxes)
+        self._root().bind("<m>", self.toggle_masks)
+        self._root().bind("<Control-m>", self.toggle_masks)
+        self._root().bind("<space>", self.toggle_all)
 
 
-def menu(root, image):
-    """Adds a Menu bar.
-    """
-    menu_bar = tk.Menu(root)
-    file_menu = tk.Menu(menu_bar, tearoff=0)
-    file_menu.add_command(label="Save", accelerator="Ctrl+S", command=image.save_image)
-    file_menu.add_separator()
-    file_menu.add_command(label="Exit", accelerator="Ctrl+Q", command=root.destroy)
-    menu_bar.add_cascade(label="File", menu=file_menu)
+class Menu(tk.Menu):
+    def __init__(self, parent, image):
+        super().__init__(parent)
+        self.image = image
+        self.file()
+        self.view()
 
-    view_menu = tk.Menu(menu_bar, tearoff=0)
-    view_menu.add_checkbutton(
-        label="BBoxes",
-        onvalue=True,
-        offvalue=False,
-        variable=image.bboxes_on,
-        command=image.update_current_image,
-    )
-    view_menu.add_checkbutton(
-        label="Masks",
-        onvalue=True,
-        offvalue=False,
-        variable=image.masks_on,
-        command=image.update_current_image,
-    )
-    menu_bar.add_cascade(label="View", menu=view_menu)
-    root.config(menu=menu_bar)
+    def file(self):
+        """File Menu.
+        """
+        file_menu = tk.Menu(self, tearoff=0)
+        file_menu.add_command(label="Save", accelerator="Ctrl+S", command=self.image.save_image)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", accelerator="Ctrl+Q", command=self.master.quit)
+        self.add_cascade(label="File", menu=file_menu)
+
+    def view(self):
+        """View Menu.
+        """
+        view_menu = tk.Menu(self, tearoff=0)
+        view_menu.add_checkbutton(
+            label="BBoxes",
+            onvalue=True,
+            offvalue=False,
+            variable=self.image.bboxes_on,
+            command=self.image.update_current_image,
+        )
+        view_menu.add_checkbutton(
+            label="Masks",
+            onvalue=True,
+            offvalue=False,
+            variable=self.image.masks_on,
+            command=self.image.update_current_image,
+        )
+        self.add_cascade(label="View", menu=view_menu)
 
 
 class ImageList:
@@ -317,6 +301,37 @@ def get_categories(instances: dict) -> dict:
     return categories
 
 
+def draw_bboxes(draw, objects, obj_categories):
+    """Puts rectangles on the image.
+    """
+    # Extracting bbox coordinates
+    bboxes = [[obj["bbox"][0],
+               obj["bbox"][1],
+               obj["bbox"][0] + obj["bbox"][2],
+               obj["bbox"][1] + obj["bbox"][3]] for obj in objects]
+    # Draw bboxes
+    for c, b in zip(obj_categories, bboxes):
+        draw.rectangle(b, outline=c[-1])
+
+
+def draw_masks(draw, objects, obj_categories):
+    """Draws a masks over image.
+    """
+    masks = [obj["segmentation"] for obj in objects]
+    # draw masks
+    for c, m in zip(obj_categories, masks):
+        alpha = 75
+        fill = tuple(list(c[-1]) + [alpha])
+        # Polygonal masks work fine
+        if isinstance(m, list):
+            draw.polygon(m[0], outline=fill, fill=fill)
+        # TODO: Fix problem with RLE
+        # elif isinstance(m, dict):
+        #     draw.polygon(m['counts'][1:-2], outline=c[-1], fill=fill)
+        else:
+            continue
+
+
 def print_info(message: str):
     logging.info(message)
 
@@ -335,8 +350,9 @@ def main():
         return
 
     image = ImageWidget(root, args.images, args.annotations)
-    menu(root, image)
-    bind_events(root, image)
+    menu = Menu(root, image)
+
+    root.config(menu=menu)
     root.mainloop()
 
 
