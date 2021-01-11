@@ -199,36 +199,44 @@ class ImageWidget(tk.Frame):
         self.image = tk.Label(self)
         self.image.pack(side=tk.TOP)
 
-        self.statusbar = tk.Frame(parent, bg="gray75")
-        self.statusbar.pack(side=tk.BOTTOM, fill=tk.X)
-        self.file_count = tk.Label(self.statusbar, bd=5, bg="gray75")
+
+class StatusBar(tk.Frame):
+    """Shows status line on the bottom.
+    """
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.configure(bg="gray75")
+        self.pack(side=tk.BOTTOM, fill=tk.X)
+
+        self.file_count = tk.Label(self, bd=5, bg="gray75")
         self.file_count.pack(side=tk.RIGHT)
-        self.description = tk.Label(self.statusbar, bd=5, bg="gray75")
+        self.description = tk.Label(self, bd=5, bg="gray75")
         self.description.pack(side=tk.RIGHT)
-        self.file_name = tk.Label(self.statusbar, bd=5, bg="gray75")
+        self.file_name = tk.Label(self, bd=5, bg="gray75")
         self.file_name.pack(side=tk.LEFT)
-        self.nobjects = tk.Label(self.statusbar, bd=5, bg="gray75")
+        self.nobjects = tk.Label(self, bd=5, bg="gray75")
         self.nobjects.pack(side=tk.LEFT)
-        self.ncategories = tk.Label(self.statusbar, bd=5, bg="gray75")
+        self.ncategories = tk.Label(self, bd=5, bg="gray75")
         self.ncategories.pack(side=tk.LEFT)
 
 
 class Controller:
-    def __init__(self, root, image, data):
+    def __init__(self, data, root, image, statusbar):
+        self.data = data
         self.root = root
         self.image = image
-        self.data = data
+        self.statusbar = statusbar
 
         self.file_count_status = tk.StringVar()
         self.file_name_status = tk.StringVar()
         self.description_status = tk.StringVar()
         self.nobjects_status = tk.StringVar()
         self.ncategories_status = tk.StringVar()
-        self.image.file_count.configure(textvariable=self.file_count_status)
-        self.image.file_name.configure(textvariable=self.file_name_status)
-        self.image.description.configure(textvariable=self.description_status)
-        self.image.nobjects.configure(textvariable=self.nobjects_status)
-        self.image.ncategories.configure(textvariable=self.ncategories_status)
+        self.statusbar.file_count.configure(textvariable=self.file_count_status)
+        self.statusbar.file_name.configure(textvariable=self.file_name_status)
+        self.statusbar.description.configure(textvariable=self.description_status)
+        self.statusbar.nobjects.configure(textvariable=self.nobjects_status)
+        self.statusbar.ncategories.configure(textvariable=self.ncategories_status)
 
         self.bboxes_on = tk.BooleanVar()
         self.bboxes_on.set(True)
@@ -368,8 +376,10 @@ def main():
         return
 
     data = Data(args.images, args.annotations)
+
+    statusbar = StatusBar(root)
     image = ImageWidget(root)
-    controller = Controller(root, image, data)
+    controller = Controller(data, root, image, statusbar)
     menu = Menu(root, controller)
     root.config(menu=menu)
     root.mainloop()
