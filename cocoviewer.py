@@ -238,16 +238,22 @@ class Controller:
         self.statusbar.nobjects.configure(textvariable=self.nobjects_status)
         self.statusbar.ncategories.configure(textvariable=self.ncategories_status)
 
-        self.bboxes_on = tk.BooleanVar()
-        self.bboxes_on.set(True)
-        self.masks_on = tk.BooleanVar()
-        self.masks_on.set(True)
+        self.bboxes_on_global = tk.BooleanVar()
+        self.bboxes_on_global.set(True)
+        self.masks_on_global = tk.BooleanVar()
+        self.masks_on_global.set(True)
+
+        self.bboxes_on_local = self.bboxes_on_global.get()
+        self.masks_on_local = self.masks_on_global.get()
+
         self.update_img()
 
         self.bind_events()
 
-    def update_img(self):
-        self.data.compose_current_image(bboxes_on=self.bboxes_on.get(), masks_on=self.masks_on.get())
+    def update_img(self, bboxes_on=None, masks_on=None):
+        self.bboxes_on_local = self.bboxes_on_global.get() if bboxes_on is None else bboxes_on
+        self.masks_on_local = self.masks_on_global.get() if masks_on is None else masks_on
+        self.data.compose_current_image(bboxes_on=self.bboxes_on_local, masks_on=self.masks_on_local)
         img = self.data.current_composed_image
         img = ImageTk.PhotoImage(img)
         self.image.image.configure(image=img)
@@ -289,20 +295,22 @@ class Controller:
             self.data.compose_current_image.save(file)
 
     def toggle_bboxes(self, event=None):
-        self.bboxes_on.set(not self.bboxes_on.get())
-        self.update_img()
+        self.bboxes_on_local = not self.bboxes_on_local
+        self.update_img(bboxes_on=self.bboxes_on_local)
 
     def toggle_masks(self, event=None):
-        self.masks_on.set(not self.masks_on.get())
-        self.update_img()
+        self.masks_on_local = not self.masks_on_local
+        self.update_img(masks_on=self.masks_on_local)
 
     def toggle_all(self, event=None):
-        var_list = [self.bboxes_on, self.masks_on]
-        if True in set([var.get() for var in var_list]):
-            [var.set(False) for var in var_list]
+        var_list = [self.bboxes_on_local, self.masks_on_local]
+        if True in set(var_list):
+            self.bboxes_on_local = False
+            self.masks_on_local = False
         else:
-            [var.set(True) for var in var_list]
-        self.update_img()
+            self.bboxes_on_local = True
+            self.masks_on_local = True
+        self.update_img(bboxes_on=self.bboxes_on_local, masks_on=self.masks_on_local)
 
     def bind_events(self):
         """Binds events.
@@ -345,14 +353,14 @@ class Menu(tk.Menu):
             label="BBoxes",
             onvalue=True,
             offvalue=False,
-            variable=self.controller.bboxes_on,
+            variable=self.controller.bboxes_on_global,
             command=self.controller.update_img,
         )
         view_menu.add_checkbutton(
             label="Masks",
             onvalue=True,
             offvalue=False,
-            variable=self.controller.masks_on,
+            variable=self.controller.masks_on_global,
             command=self.controller.update_img,
         )
         self.add_cascade(label="View", menu=view_menu)
@@ -363,7 +371,7 @@ def print_info(message: str):
 
 
 def main():
-    print_info("Starting the app...")
+    print_info("Starting...")
     args = parser.parse_args()
     root = tk.Tk()
     root.title("COCO Viewer")
