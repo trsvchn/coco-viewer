@@ -38,13 +38,14 @@ class Data:
         self.current_image = self.images.next()  # Set the first image as current
         self.current_composed_image = None  # To store composed PIL Image
 
-    def compose_image(self, image: tuple, bboxes_on: bool = True, masks_on: bool = True):
+    def compose_image(self, image: tuple, bboxes_on: bool = True, masks_on: bool = True, ignore: list = None):
         """Loads image as PIL Image and draw bboxes and/or masks.
         """
         # TODO: labels for object classes
         # TODO: predicted bboxes drawing (from models)
         img_id, img_name = image
         full_path = os.path.join(self.image_dir, img_name)
+        ignore = ignore or []  # list of objects to ignore
         # Open image
         img_open = Image.open(full_path).convert("RGBA")
         # Create layer for bboxes and masks
@@ -63,11 +64,11 @@ class Data:
 
         # Draw masks
         if masks_on:
-            draw_masks(draw, objects, names_colors)
+            draw_masks(draw, objects, names_colors, ignore)
 
         # Draw bounding boxes
         if bboxes_on:
-            draw_bboxes(draw, objects, names_colors)
+            draw_bboxes(draw, objects, names_colors, ignore)
 
         del draw
 
@@ -131,7 +132,7 @@ def get_categories(instances: dict) -> dict:
     return categories
 
 
-def draw_bboxes(draw, objects, obj_categories):
+def draw_bboxes(draw, objects, obj_categories, ignore):
     """Puts rectangles on the image.
     """
     # Extracting bbox coordinates
@@ -140,26 +141,28 @@ def draw_bboxes(draw, objects, obj_categories):
                obj["bbox"][0] + obj["bbox"][2],
                obj["bbox"][1] + obj["bbox"][3]] for obj in objects]
     # Draw bboxes
-    for c, b in zip(obj_categories, bboxes):
-        draw.rectangle(b, outline=c[-1])
+    for i, (c, b) in enumerate(zip(obj_categories, bboxes)):
+        if i not in ignore:
+            draw.rectangle(b, outline=c[-1])
 
 
-def draw_masks(draw, objects, obj_categories):
+def draw_masks(draw, objects, obj_categories, ignore):
     """Draws a masks over image.
     """
     masks = [obj["segmentation"] for obj in objects]
-    # draw masks
-    for c, m in zip(obj_categories, masks):
-        alpha = 75
-        fill = tuple(list(c[-1]) + [alpha])
-        # Polygonal masks work fine
-        if isinstance(m, list):
-            draw.polygon(m[0], outline=fill, fill=fill)
-        # TODO: Fix problem with RLE
-        # elif isinstance(m, dict):
-        #     draw.polygon(m['counts'][1:-2], outline=c[-1], fill=fill)
-        else:
-            continue
+    # Draw masks
+    for i, (c, m) in enumerate(zip(obj_categories, masks)):
+        if i not in ignore:
+            alpha = 75
+            fill = tuple(list(c[-1]) + [alpha])
+            # Polygonal masks work fine
+            if isinstance(m, list):
+                draw.polygon(m[0], outline=fill, fill=fill)
+            # TODO: Fix problem with RLE
+            # elif isinstance(m, dict):
+            #     draw.polygon(m['counts'][1:-2], outline=c[-1], fill=fill)
+            else:
+                continue
 
 
 class ImageList:
@@ -308,7 +311,7 @@ class Controller:
         self.masks_on_local = self.masks_on_global.get()
 
         # Objects Panel stuff
-        self.selected_cats = [_ for _ in range(1, len(self.data.img_categories))]
+        self.selected_cats = [_ for _ in range(len(self.data.img_categories))]
         self.selected_objs = [_ for _ in range(len(self.data.img_obj_categories))]
         self.category_box_content = tk.StringVar()
         self.object_box_content = tk.StringVar()
@@ -328,9 +331,10 @@ class Controller:
         """
         self.bboxes_on_local = self.bboxes_on_global.get() if bboxes_on is None else bboxes_on
         self.masks_on_local = self.masks_on_global.get() if masks_on is None else masks_on
+        ignore = [i for i in range(len(self.data.img_obj_categories)) if i not in self.selected_objs]
 
         # Compose image
-        self.data.compose_current_image(bboxes_on=self.bboxes_on_local, masks_on=self.masks_on_local)
+        self.data.compose_current_image(bboxes_on=self.bboxes_on_local, masks_on=self.masks_on_local, ignore=ignore)
 
         # Prepare PIL image for Tkinter
         img = self.data.current_composed_image
@@ -357,13 +361,13 @@ class Controller:
 
     def next_img(self, event=None):
         self.data.next_image()
-        self.selected_cats = [_ for _ in range(1, len(self.data.img_categories))]
+        self.selected_cats = [_ for _ in range(len(self.data.img_categories))]
         self.selected_objs = [_ for _ in range(len(self.data.img_obj_categories))]
         self.update_img()
 
     def prev_img(self, event=None):
         self.data.previous_image()
-        self.selected_cats = [_ for _ in range(1, len(self.data.img_categories))]
+        self.selected_cats = [_ for _ in range(len(self.data.img_categories))]
         self.selected_objs = [_ for _ in range(len(self.data.img_obj_categories))]
         self.update_img()
 
