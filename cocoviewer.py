@@ -273,6 +273,20 @@ class ObjectsPanel(tk.Frame):
         self.object_box.pack(side=tk.RIGHT, fill=tk.Y)
 
 
+class SlidersBar(tk.Frame):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # Bbox thickness controller
+        self.bbox_slider = tk.Scale(self, label="bbox", from_=0, to=10, tickinterval=1, orient=tk.HORIZONTAL)
+        self.bbox_slider.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        # Mask transparency controller
+        self.mask_slider = tk.Scale(self, label="mask", from_=0, to=100, tickinterval=10, orient=tk.HORIZONTAL)
+        self.mask_slider.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+
 class Controller:
     def __init__(self, data, root, image, statusbar, menu, objects_panel):
         self.data = data  # data layer
@@ -515,6 +529,7 @@ def main():
 
     data = Data(args.images, args.annotations)
     statusbar = StatusBar(root)
+    sliders = SlidersBar(root)
     objects_panel = ObjectsPanel(root)
     menu = Menu(root)
     image = ImageWidget(root)
