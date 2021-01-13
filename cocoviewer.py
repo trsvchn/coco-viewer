@@ -30,41 +30,48 @@ class Data:
         instances, images, categories = parse_coco(self.annotations_file)
         self.instances = instances
         self.images = ImageList(images)  # NOTE: image list is based on annotations file
-        self.categories = categories
-        self.nobjects = None
-        self.ncategories = None
-        # Load and prepare the very first image
+        self.categories = categories  # Dataset categories
+        self.img_obj_categories = None  # as list of category ids of all objects
+        self.img_categories = None  # current image categories (unique sorted category ids)
+
+        # Prepare the very first image
         self.current_image = self.images.next()  # Set the first image as current
         self.current_composed_image = None  # To store composed PIL Image
 
-    def compose_image(self, image: tuple, bboxes_on: bool = True, masks_on: bool = True):
+    def compose_image(self, image: tuple, bboxes_on: bool = True, masks_on: bool = True, ignore: list = None):
         """Loads image as PIL Image and draw bboxes and/or masks.
         """
         # TODO: labels for object classes
         # TODO: predicted bboxes drawing (from models)
         img_id, img_name = image
         full_path = os.path.join(self.image_dir, img_name)
+        ignore = ignore or []  # list of objects to ignore
         # Open image
         img_open = Image.open(full_path).convert("RGBA")
         # Create layer for bboxes and masks
         draw_layer = Image.new("RGBA", img_open.size, (255, 255, 255, 0))
         draw = ImageDraw.Draw(draw_layer)
-        # Get objects
+
+        # Get objects and category ids
         objects = [obj for obj in self.instances["annotations"] if obj["image_id"] == img_id]
-        obj_categories = [self.categories[obj["category_id"]] for obj in objects]
+        obj_categories_ids = [obj["category_id"] for obj in objects]
+        # Store category id of each object and unique cat ids for the image
+        self.img_obj_categories = [obj["category_id"] for obj in objects]
+        self.img_categories = sorted(list(set(self.img_obj_categories)))
 
-        self.nobjects = len(objects)
-        self.ncategories = len(set([obj["category_id"] for obj in objects]))
+        # Get category name - color pairs for the objects
+        names_colors = [self.categories[i] for i in obj_categories_ids]
 
-        # Prepare masks
+        # Draw masks
         if masks_on:
-            draw_masks(draw, objects, obj_categories)
+            draw_masks(draw, objects, names_colors, ignore)
 
         # Draw bounding boxes
         if bboxes_on:
-            draw_bboxes(draw, objects, obj_categories)
+            draw_bboxes(draw, objects, names_colors, ignore)
 
         del draw
+
         # Set composed resulting image
         self.current_composed_image = Image.alpha_composite(img_open, draw_layer)
 
@@ -125,7 +132,7 @@ def get_categories(instances: dict) -> dict:
     return categories
 
 
-def draw_bboxes(draw, objects, obj_categories):
+def draw_bboxes(draw, objects, obj_categories, ignore):
     """Puts rectangles on the image.
     """
     # Extracting bbox coordinates
@@ -134,26 +141,28 @@ def draw_bboxes(draw, objects, obj_categories):
                obj["bbox"][0] + obj["bbox"][2],
                obj["bbox"][1] + obj["bbox"][3]] for obj in objects]
     # Draw bboxes
-    for c, b in zip(obj_categories, bboxes):
-        draw.rectangle(b, outline=c[-1])
+    for i, (c, b) in enumerate(zip(obj_categories, bboxes)):
+        if i not in ignore:
+            draw.rectangle(b, outline=c[-1])
 
 
-def draw_masks(draw, objects, obj_categories):
+def draw_masks(draw, objects, obj_categories, ignore):
     """Draws a masks over image.
     """
     masks = [obj["segmentation"] for obj in objects]
-    # draw masks
-    for c, m in zip(obj_categories, masks):
-        alpha = 75
-        fill = tuple(list(c[-1]) + [alpha])
-        # Polygonal masks work fine
-        if isinstance(m, list):
-            draw.polygon(m[0], outline=fill, fill=fill)
-        # TODO: Fix problem with RLE
-        # elif isinstance(m, dict):
-        #     draw.polygon(m['counts'][1:-2], outline=c[-1], fill=fill)
-        else:
-            continue
+    # Draw masks
+    for i, (c, m) in enumerate(zip(obj_categories, masks)):
+        if i not in ignore:
+            alpha = 75
+            fill = tuple(list(c[-1]) + [alpha])
+            # Polygonal masks work fine
+            if isinstance(m, list):
+                draw.polygon(m[0], outline=fill, fill=fill)
+            # TODO: Fix problem with RLE
+            # elif isinstance(m, dict):
+            #     draw.polygon(m['counts'][1:-2], outline=c[-1], fill=fill)
+            else:
+                continue
 
 
 class ImageList:
@@ -219,13 +228,61 @@ class StatusBar(tk.Frame):
         self.ncategories.pack(side=tk.LEFT)
 
 
-class Controller:
-    def __init__(self, data, root, image, statusbar):
-        self.data = data
-        self.root = root
-        self.image = image
-        self.statusbar = statusbar
+class Menu(tk.Menu):
+    def __init__(self, parent):
+        super().__init__(parent)
+        # Define menu structure
+        self.file = self.file_menu()
+        self.view = self.view_menu()
 
+    def file_menu(self):
+        """File Menu.
+        """
+        menu = tk.Menu(self, tearoff=False)
+        menu.add_command(label="Save", accelerator="Ctrl+S")
+        menu.add_separator()
+        menu.add_command(label="Exit", accelerator="Ctrl+Q")
+        self.add_cascade(label="File", menu=menu)
+        return menu
+
+    def view_menu(self):
+        """View Menu.
+        """
+        menu = tk.Menu(self, tearoff=False)
+        menu.add_checkbutton(label="BBoxes", onvalue=True, offvalue=False)
+        menu.add_checkbutton(label="Masks", onvalue=True, offvalue=False)
+        self.add_cascade(label="View", menu=menu)
+        return menu
+
+
+class ObjectsPanel(tk.Frame):
+    """Panels with listed objects and categories for the image.
+    """
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Categories subpanel
+        tk.Label(self, text="categories", bd=2, bg="gray50").pack(side=tk.TOP, fill=tk.X)
+        self.category_box = tk.Listbox(self, selectmode=tk.EXTENDED, exportselection=0)
+        self.category_box.pack(side=tk.TOP, fill=tk.Y)
+
+        # Objects subpanel
+        tk.Label(self, text="objects", bd=2, bg="gray50").pack(side=tk.TOP, fill=tk.X)
+        self.object_box = tk.Listbox(self, selectmode=tk.EXTENDED, exportselection=0)
+        self.object_box.pack(side=tk.RIGHT, fill=tk.Y)
+
+
+class Controller:
+    def __init__(self, data, root, image, statusbar, menu, objects_panel):
+        self.data = data  # data layer
+        self.root = root  # root window
+        self.image = image  # image widget
+        self.statusbar = statusbar  # statusbar on the bottom
+        self.menu = menu  # main menu on the top
+        self.objects_panel = objects_panel
+
+        # StatusBar Vars
         self.file_count_status = tk.StringVar()
         self.file_name_status = tk.StringVar()
         self.description_status = tk.StringVar()
@@ -237,31 +294,66 @@ class Controller:
         self.statusbar.nobjects.configure(textvariable=self.nobjects_status)
         self.statusbar.ncategories.configure(textvariable=self.ncategories_status)
 
-        self.bboxes_on_global = tk.BooleanVar()
+        # Menu Vars
+        self.bboxes_on_global = tk.BooleanVar()  # Toggles bboxes globally
         self.bboxes_on_global.set(True)
-        self.masks_on_global = tk.BooleanVar()
+        self.masks_on_global = tk.BooleanVar()  # Toggles masks globally
         self.masks_on_global.set(True)
+        # Menu Configuration
+        self.menu.file.entryconfigure("Save", command=self.save_image)
+        self.menu.file.entryconfigure("Exit", command=self.exit)
+        self.menu.view.entryconfigure("BBoxes", variable=self.bboxes_on_global, command=self.update_img)
+        self.menu.view.entryconfigure("Masks", variable=self.masks_on_global, command=self.update_img)
+        self.root.configure(menu=self.menu)
 
+        # Init local setup (for the current (active) image)
         self.bboxes_on_local = self.bboxes_on_global.get()
         self.masks_on_local = self.masks_on_global.get()
 
-        self.update_img()
+        # Objects Panel stuff
+        self.selected_cats = [_ for _ in range(len(self.data.img_categories))]
+        self.selected_objs = [_ for _ in range(len(self.data.img_obj_categories))]
+        self.category_box_content = tk.StringVar()
+        self.object_box_content = tk.StringVar()
+        # self.categories_to_ignore = []
+        # self.objects_to_ignore = []
+        self.objects_panel.category_box.configure(listvariable=self.category_box_content)
+        self.objects_panel.object_box.configure(listvariable=self.object_box_content)
 
+        # Bind all events
         self.bind_events()
 
+        # Compose the very first image
+        self.update_img()
+
     def update_img(self, bboxes_on=None, masks_on=None):
+        """Triggers image composition and sets composed image as current.
+        """
         self.bboxes_on_local = self.bboxes_on_global.get() if bboxes_on is None else bboxes_on
         self.masks_on_local = self.masks_on_global.get() if masks_on is None else masks_on
-        self.data.compose_current_image(bboxes_on=self.bboxes_on_local, masks_on=self.masks_on_local)
+        ignore = [i for i in range(len(self.data.img_obj_categories)) if i not in self.selected_objs]
+
+        # Compose image
+        self.data.compose_current_image(bboxes_on=self.bboxes_on_local, masks_on=self.masks_on_local, ignore=ignore)
+
+        # Prepare PIL image for Tkinter
         img = self.data.current_composed_image
         img = ImageTk.PhotoImage(img)
+
+        # Set image as current
         self.image.image.configure(image=img)
         self.image.image.image = img
+
+        # Update statusbar vars
         self.file_count_status.set(f"{str(self.data.images.n + 1)}/{self.data.images.max}")
         self.file_name_status.set(f"{self.data.current_image[-1]}")
         self.description_status.set(f"{self.data.instances.get('info', '').get('description', '')}")
-        self.nobjects_status.set(f"objects: {self.data.nobjects}")
-        self.ncategories_status.set(f"categories: {self.data.ncategories}")
+        self.nobjects_status.set(f"objects: {len(self.data.img_obj_categories)}")
+        self.ncategories_status.set(f"categories: {len(self.data.img_categories)}")
+
+        # Update Objects panel
+        self.update_category_box()
+        self.update_object_box()
 
     def exit(self, event=None):
         print_info("Exiting...")
@@ -269,10 +361,14 @@ class Controller:
 
     def next_img(self, event=None):
         self.data.next_image()
+        self.selected_cats = [_ for _ in range(len(self.data.img_categories))]
+        self.selected_objs = [_ for _ in range(len(self.data.img_obj_categories))]
         self.update_img()
 
     def prev_img(self, event=None):
         self.data.previous_image()
+        self.selected_cats = [_ for _ in range(len(self.data.img_categories))]
+        self.selected_objs = [_ for _ in range(len(self.data.img_obj_categories))]
         self.update_img()
 
     def save_image(self, event=None):
@@ -302,67 +398,93 @@ class Controller:
         self.update_img(masks_on=self.masks_on_local)
 
     def toggle_all(self, event=None):
+        # Toggle only when focused on image
+        if event.widget.focus_get() is self.objects_panel.category_box:
+            return
+        if event.widget.focus_get() is self.objects_panel.object_box:
+            return
+        # What to toggle
         var_list = [self.bboxes_on_local, self.masks_on_local]
+        # if any is on, turn them off
         if True in set(var_list):
             self.bboxes_on_local = False
             self.masks_on_local = False
+        # if all is off, turn them on
         else:
             self.bboxes_on_local = True
             self.masks_on_local = True
+        # Update image with updated vars
         self.update_img(bboxes_on=self.bboxes_on_local, masks_on=self.masks_on_local)
+
+    def update_category_box(self):
+        ids = self.data.img_categories
+        names = [self.data.categories[i][0] for i in ids]
+        self.category_box_content.set([" ".join([str(i), str(n)]) for i, n in zip(ids, names)])
+        self.objects_panel.category_box.selection_clear(0, tk.END)
+        for i in self.selected_cats:
+            self.objects_panel.category_box.select_set(i)
+
+    def select_category(self, event):
+        # Get selection from user
+        selected_ids = self.objects_panel.category_box.curselection()
+        # Set selected_cats
+        self.selected_cats = selected_ids
+        # Set selected_objs
+        selected_objs = []
+        for ci in self.selected_cats:
+            for i, o in enumerate(self.data.img_obj_categories):
+                if self.data.img_categories[ci] == o:
+                    selected_objs.append(i)
+        self.selected_objs = selected_objs
+        self.update_img()
+
+    def update_object_box(self):
+        ids = self.data.img_obj_categories
+        names = [self.data.categories[i][0] for i in ids]
+        self.object_box_content.set([" ".join([str(i), str(n)]) for i, n in enumerate(names)])
+        self.objects_panel.object_box.selection_clear(0, tk.END)
+        for i in self.selected_objs:
+            self.objects_panel.object_box.select_set(i)
+
+    def select_object(self, event):
+        # Get selection from user
+        selected_ids = self.objects_panel.object_box.curselection()
+        # Set selected_cats
+        self.selected_objs = selected_ids
+        # Set selected_objs
+        selected_cats = []
+        for oi in self.selected_objs:
+            for i, c in enumerate(self.data.img_categories):
+                if self.data.img_obj_categories[oi] == c:
+                    selected_cats.append(i)
+        self.selected_cats = selected_cats
+        self.update_img()
 
     def bind_events(self):
         """Binds events.
         """
+        # Navigation
         self.root.bind("<Left>", self.prev_img)
         self.root.bind("<k>", self.prev_img)
         self.root.bind("<Right>", self.next_img)
         self.root.bind("<j>", self.next_img)
         self.root.bind("<Control-q>", self.exit)
         self.root.bind("<Control-w>", self.exit)
+
+        # Files
         self.root.bind("<Control-s>", self.save_image)
+
+        # View Toggles
         self.root.bind("<b>", self.toggle_bboxes)
         self.root.bind("<Control-b>", self.toggle_bboxes)
         self.root.bind("<m>", self.toggle_masks)
         self.root.bind("<Control-m>", self.toggle_masks)
         self.root.bind("<space>", self.toggle_all)
 
-
-class Menu(tk.Menu):
-    def __init__(self, parent, controller):
-        super().__init__(parent)
-        self.controller = controller
-        self.file()
-        self.view()
-
-    def file(self):
-        """File Menu.
-        """
-        file_menu = tk.Menu(self, tearoff=0)
-        file_menu.add_command(label="Save", accelerator="Ctrl+S", command=self.controller.save_image)
-        file_menu.add_separator()
-        file_menu.add_command(label="Exit", accelerator="Ctrl+Q", command=self.controller.exit)
-        self.add_cascade(label="File", menu=file_menu)
-
-    def view(self):
-        """View Menu.
-        """
-        view_menu = tk.Menu(self, tearoff=0)
-        view_menu.add_checkbutton(
-            label="BBoxes",
-            onvalue=True,
-            offvalue=False,
-            variable=self.controller.bboxes_on_global,
-            command=self.controller.update_img,
-        )
-        view_menu.add_checkbutton(
-            label="Masks",
-            onvalue=True,
-            offvalue=False,
-            variable=self.controller.masks_on_global,
-            command=self.controller.update_img,
-        )
-        self.add_cascade(label="View", menu=view_menu)
+        # Objects Panel
+        self.objects_panel.category_box.bind('<<ListboxSelect>>', self.select_category)
+        self.objects_panel.object_box.bind('<<ListboxSelect>>', self.select_object)
+        self.image.image.bind("<Button-1>", lambda e: self.image.focus_set())
 
 
 def print_info(message: str):
@@ -384,11 +506,12 @@ def main():
 
     data = Data(args.images, args.annotations)
 
+    data.compose_current_image()
     statusbar = StatusBar(root)
+    objects_panel = ObjectsPanel(root)
+    menu = Menu(root)
     image = ImageWidget(root)
-    controller = Controller(data, root, image, statusbar)
-    menu = Menu(root, controller)
-    root.config(menu=menu)
+    Controller(data, root, image, statusbar, menu, objects_panel)
     root.mainloop()
 
 
