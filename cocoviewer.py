@@ -38,7 +38,15 @@ class Data:
         self.current_image = self.images.next()  # Set the first image as current
         self.current_composed_image = None  # To store composed PIL Image
 
-    def compose_image(self, image: tuple, bboxes_on: bool = True, masks_on: bool = True, ignore: list = None):
+    def compose_image(
+            self,
+            image: tuple,
+            bboxes_on: bool = True,
+            masks_on: bool = True,
+            ignore: list = None,
+            width: int = 1,
+            alpha: int = 128,
+    ):
         """Loads image as PIL Image and draw bboxes and/or masks.
         """
         # TODO: labels for object classes
@@ -64,11 +72,11 @@ class Data:
 
         # Draw masks
         if masks_on:
-            draw_masks(draw, objects, names_colors, ignore)
+            draw_masks(draw, objects, names_colors, ignore, alpha)
 
         # Draw bounding boxes
         if bboxes_on:
-            draw_bboxes(draw, objects, names_colors, ignore)
+            draw_bboxes(draw, objects, names_colors, ignore, width)
 
         del draw
 
@@ -132,7 +140,7 @@ def get_categories(instances: dict) -> dict:
     return categories
 
 
-def draw_bboxes(draw, objects, obj_categories, ignore):
+def draw_bboxes(draw, objects, obj_categories, ignore, width):
     """Puts rectangles on the image.
     """
     # Extracting bbox coordinates
@@ -143,17 +151,17 @@ def draw_bboxes(draw, objects, obj_categories, ignore):
     # Draw bboxes
     for i, (c, b) in enumerate(zip(obj_categories, bboxes)):
         if i not in ignore:
-            draw.rectangle(b, outline=c[-1])
+            draw.rectangle(b, outline=c[-1], width=width)
 
 
-def draw_masks(draw, objects, obj_categories, ignore):
+def draw_masks(draw, objects, obj_categories, ignore, alpha):
     """Draws a masks over image.
     """
     masks = [obj["segmentation"] for obj in objects]
     # Draw masks
     for i, (c, m) in enumerate(zip(obj_categories, masks)):
         if i not in ignore:
-            alpha = 75
+            alpha = alpha
             fill = tuple(list(c[-1]) + [alpha])
             # Polygonal masks work fine
             if isinstance(m, list):
@@ -279,22 +287,23 @@ class SlidersBar(tk.Frame):
         self.pack(side=tk.BOTTOM, fill=tk.X)
 
         # Bbox thickness controller
-        self.bbox_slider = tk.Scale(self, label="bbox", from_=0, to=10, tickinterval=1, orient=tk.HORIZONTAL)
+        self.bbox_slider = tk.Scale(self, label="bbox", from_=0, to=25, tickinterval=5, orient=tk.HORIZONTAL)
         self.bbox_slider.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         # Mask transparency controller
-        self.mask_slider = tk.Scale(self, label="mask", from_=0, to=100, tickinterval=10, orient=tk.HORIZONTAL)
+        self.mask_slider = tk.Scale(self, label="mask", from_=0, to=255, tickinterval=25, orient=tk.HORIZONTAL)
         self.mask_slider.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
 
 class Controller:
-    def __init__(self, data, root, image, statusbar, menu, objects_panel):
+    def __init__(self, data, root, image, statusbar, menu, objects_panel, sliders):
         self.data = data  # data layer
         self.root = root  # root window
         self.image = image  # image widget
         self.statusbar = statusbar  # statusbar on the bottom
         self.menu = menu  # main menu on the top
         self.objects_panel = objects_panel
+        self.sliders = sliders
 
         # StatusBar Vars
         self.file_count_status = tk.StringVar()
@@ -329,10 +338,16 @@ class Controller:
         self.selected_objs = None
         self.category_box_content = tk.StringVar()
         self.object_box_content = tk.StringVar()
-        # self.categories_to_ignore = []
-        # self.objects_to_ignore = []
         self.objects_panel.category_box.configure(listvariable=self.category_box_content)
         self.objects_panel.object_box.configure(listvariable=self.object_box_content)
+
+        # Sliders Setup
+        self.bbox_thickness = tk.IntVar()
+        self.bbox_thickness.set(1)
+        self.mask_alpha = tk.IntVar()
+        self.mask_alpha.set(128)
+        self.sliders.bbox_slider.configure(variable=self.bbox_thickness, command=self.update_img)
+        self.sliders.mask_slider.configure(variable=self.mask_alpha, command=self.update_img)
 
         # Bind all events
         self.bind_events()
@@ -340,7 +355,7 @@ class Controller:
         # Compose the very first image
         self.update_img()
 
-    def update_img(self, bboxes_on=None, masks_on=None):
+    def update_img(self, bboxes_on=None, masks_on=None, width=None, alpha=None):
         """Triggers image composition and sets composed image as current.
         """
         self.bboxes_on_local = self.bboxes_on_global.get() if bboxes_on is None else bboxes_on
@@ -350,8 +365,17 @@ class Controller:
         else:
             ignore = [i for i in range(len(self.data.img_obj_categories)) if i not in self.selected_objs]
 
+        width = self.bbox_thickness.get() if width is None else width
+        alpha = self.mask_alpha.get() if alpha is None else alpha
+
         # Compose image
-        self.data.compose_current_image(bboxes_on=self.bboxes_on_local, masks_on=self.masks_on_local, ignore=ignore)
+        self.data.compose_current_image(
+            bboxes_on=self.bboxes_on_local,
+            masks_on=self.masks_on_local,
+            ignore=ignore,
+            width=width,
+            alpha=alpha,
+        )
 
         # Prepare PIL image for Tkinter
         img = self.data.current_composed_image
@@ -533,7 +557,7 @@ def main():
     objects_panel = ObjectsPanel(root)
     menu = Menu(root)
     image = ImageWidget(root)
-    Controller(data, root, image, statusbar, menu, objects_panel)
+    Controller(data, root, image, statusbar, menu, objects_panel, sliders)
     root.mainloop()
 
 
