@@ -311,8 +311,8 @@ class Controller:
         self.masks_on_local = self.masks_on_global.get()
 
         # Objects Panel stuff
-        self.selected_cats = [_ for _ in range(len(self.data.img_categories))]
-        self.selected_objs = [_ for _ in range(len(self.data.img_obj_categories))]
+        self.selected_cats = None
+        self.selected_objs = None
         self.category_box_content = tk.StringVar()
         self.object_box_content = tk.StringVar()
         # self.categories_to_ignore = []
@@ -331,7 +331,10 @@ class Controller:
         """
         self.bboxes_on_local = self.bboxes_on_global.get() if bboxes_on is None else bboxes_on
         self.masks_on_local = self.masks_on_global.get() if masks_on is None else masks_on
-        ignore = [i for i in range(len(self.data.img_obj_categories)) if i not in self.selected_objs]
+        if self.selected_objs is None:
+            ignore = []
+        else:
+            ignore = [i for i in range(len(self.data.img_obj_categories)) if i not in self.selected_objs]
 
         # Compose image
         self.data.compose_current_image(bboxes_on=self.bboxes_on_local, masks_on=self.masks_on_local, ignore=ignore)
@@ -361,14 +364,14 @@ class Controller:
 
     def next_img(self, event=None):
         self.data.next_image()
-        self.selected_cats = [_ for _ in range(len(self.data.img_categories))]
-        self.selected_objs = [_ for _ in range(len(self.data.img_obj_categories))]
+        self.selected_cats = None
+        self.selected_objs = None
         self.update_img()
 
     def prev_img(self, event=None):
         self.data.previous_image()
-        self.selected_cats = [_ for _ in range(len(self.data.img_categories))]
-        self.selected_objs = [_ for _ in range(len(self.data.img_obj_categories))]
+        self.selected_cats = None
+        self.selected_objs = None
         self.update_img()
 
     def save_image(self, event=None):
@@ -421,8 +424,11 @@ class Controller:
         names = [self.data.categories[i][0] for i in ids]
         self.category_box_content.set([" ".join([str(i), str(n)]) for i, n in zip(ids, names)])
         self.objects_panel.category_box.selection_clear(0, tk.END)
-        for i in self.selected_cats:
-            self.objects_panel.category_box.select_set(i)
+        if self.selected_cats is not None:
+            for i in self.selected_cats:
+                self.objects_panel.category_box.select_set(i)
+        else:
+            self.objects_panel.category_box.select_set(0, tk.END)
 
     def select_category(self, event):
         # Get selection from user
@@ -443,8 +449,11 @@ class Controller:
         names = [self.data.categories[i][0] for i in ids]
         self.object_box_content.set([" ".join([str(i), str(n)]) for i, n in enumerate(names)])
         self.objects_panel.object_box.selection_clear(0, tk.END)
-        for i in self.selected_objs:
-            self.objects_panel.object_box.select_set(i)
+        if self.selected_objs is not None:
+            for i in self.selected_objs:
+                self.objects_panel.object_box.select_set(i)
+        else:
+            self.objects_panel.object_box.select_set(0, tk.END)
 
     def select_object(self, event):
         # Get selection from user
