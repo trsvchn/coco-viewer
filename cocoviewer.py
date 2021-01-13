@@ -308,6 +308,8 @@ class Controller:
         self.masks_on_local = self.masks_on_global.get()
 
         # Objects Panel stuff
+        self.selected_cats = [_ for _ in range(1, len(self.data.img_categories))]
+        self.selected_objs = [_ for _ in range(len(self.data.img_obj_categories))]
         self.category_box_content = tk.StringVar()
         self.object_box_content = tk.StringVar()
         # self.categories_to_ignore = []
@@ -355,10 +357,14 @@ class Controller:
 
     def next_img(self, event=None):
         self.data.next_image()
+        self.selected_cats = [_ for _ in range(1, len(self.data.img_categories))]
+        self.selected_objs = [_ for _ in range(len(self.data.img_obj_categories))]
         self.update_img()
 
     def prev_img(self, event=None):
         self.data.previous_image()
+        self.selected_cats = [_ for _ in range(1, len(self.data.img_categories))]
+        self.selected_objs = [_ for _ in range(len(self.data.img_obj_categories))]
         self.update_img()
 
     def save_image(self, event=None):
@@ -403,11 +409,43 @@ class Controller:
 
     def update_category_box(self):
         self.category_box_content.set(self.data.img_categories)
-        self.objects_panel.category_box.select_set(0, tk.END)
+        self.objects_panel.category_box.selection_clear(0, tk.END)
+        for i in self.selected_cats:
+            self.objects_panel.category_box.select_set(i)
+
+    def select_category(self, event):
+        # Get selection from user
+        selected_ids = self.objects_panel.category_box.curselection()
+        # Set selected_cats
+        self.selected_cats = selected_ids
+        # Set selected_objs
+        selected_objs = []
+        for ci in self.selected_cats:
+            for i, o in enumerate(self.data.img_obj_categories):
+                if self.data.img_categories[ci] == o:
+                    selected_objs.append(i)
+        self.selected_objs = selected_objs
+        self.update_img()
 
     def update_object_box(self):
         self.object_box_content.set(self.data.img_obj_categories)
-        self.objects_panel.object_box.select_set(0, tk.END)
+        self.objects_panel.object_box.selection_clear(0, tk.END)
+        for i in self.selected_objs:
+            self.objects_panel.object_box.select_set(i)
+
+    def select_object(self, event):
+        # Get selection from user
+        selected_ids = self.objects_panel.object_box.curselection()
+        # Set selected_cats
+        self.selected_objs = selected_ids
+        # Set selected_objs
+        selected_cats = []
+        for oi in self.selected_objs:
+            for i, c in enumerate(self.data.img_categories):
+                if self.data.img_obj_categories[oi] == c:
+                    selected_cats.append(i)
+        self.selected_cats = selected_cats
+        self.update_img()
 
     def bind_events(self):
         """Binds events.
@@ -429,6 +467,10 @@ class Controller:
         self.root.bind("<m>", self.toggle_masks)
         self.root.bind("<Control-m>", self.toggle_masks)
         self.root.bind("<space>", self.toggle_all)
+
+        # Objects Panel
+        self.objects_panel.category_box.bind('<<ListboxSelect>>', self.select_category)
+        self.objects_panel.object_box.bind('<<ListboxSelect>>', self.select_object)
 
 
 def print_info(message: str):
