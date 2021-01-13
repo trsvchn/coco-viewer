@@ -33,7 +33,8 @@ class Data:
         self.categories = categories
         self.nobjects = None
         self.ncategories = None
-        # Load and prepare the very first image
+
+        # Prepare the very first image
         self.current_image = self.images.next()  # Set the first image as current
         self.current_composed_image = None  # To store composed PIL Image
 
@@ -221,11 +222,12 @@ class StatusBar(tk.Frame):
 
 class Controller:
     def __init__(self, data, root, image, statusbar):
-        self.data = data
-        self.root = root
-        self.image = image
-        self.statusbar = statusbar
+        self.data = data  # data layer
+        self.root = root  # root window
+        self.image = image  # image widget
+        self.statusbar = statusbar  # statusbar on the bottom
 
+        # StatusBar Vars
         self.file_count_status = tk.StringVar()
         self.file_name_status = tk.StringVar()
         self.description_status = tk.StringVar()
@@ -237,26 +239,40 @@ class Controller:
         self.statusbar.nobjects.configure(textvariable=self.nobjects_status)
         self.statusbar.ncategories.configure(textvariable=self.ncategories_status)
 
-        self.bboxes_on_global = tk.BooleanVar()
+        # Menu Vars
+        self.bboxes_on_global = tk.BooleanVar()  # Toggles bboxes globally
         self.bboxes_on_global.set(True)
-        self.masks_on_global = tk.BooleanVar()
+        self.masks_on_global = tk.BooleanVar()  # Toggles masks globally
         self.masks_on_global.set(True)
 
+        # Init local setup (for the current (active) image)
         self.bboxes_on_local = self.bboxes_on_global.get()
         self.masks_on_local = self.masks_on_global.get()
 
-        self.update_img()
-
+        # Bind all events
         self.bind_events()
 
+        # Compose the very first image
+        self.update_img()
+
     def update_img(self, bboxes_on=None, masks_on=None):
+        """Triggers image composition and sets composed image as current.
+        """
         self.bboxes_on_local = self.bboxes_on_global.get() if bboxes_on is None else bboxes_on
         self.masks_on_local = self.masks_on_global.get() if masks_on is None else masks_on
+
+        # Compose image
         self.data.compose_current_image(bboxes_on=self.bboxes_on_local, masks_on=self.masks_on_local)
+
+        # Prepare PIL image for Tkinter
         img = self.data.current_composed_image
         img = ImageTk.PhotoImage(img)
+
+        # Set image as current
         self.image.image.configure(image=img)
         self.image.image.image = img
+
+        # Update statusbar vars
         self.file_count_status.set(f"{str(self.data.images.n + 1)}/{self.data.images.max}")
         self.file_name_status.set(f"{self.data.current_image[-1]}")
         self.description_status.set(f"{self.data.instances.get('info', '').get('description', '')}")
@@ -302,25 +318,34 @@ class Controller:
         self.update_img(masks_on=self.masks_on_local)
 
     def toggle_all(self, event=None):
+        # What to toggle
         var_list = [self.bboxes_on_local, self.masks_on_local]
+        # if any is on, turn them off
         if True in set(var_list):
             self.bboxes_on_local = False
             self.masks_on_local = False
+        # if all is off, turn them on
         else:
             self.bboxes_on_local = True
             self.masks_on_local = True
+        # Update image with updated vars
         self.update_img(bboxes_on=self.bboxes_on_local, masks_on=self.masks_on_local)
 
     def bind_events(self):
         """Binds events.
         """
+        # Navigation
         self.root.bind("<Left>", self.prev_img)
         self.root.bind("<k>", self.prev_img)
         self.root.bind("<Right>", self.next_img)
         self.root.bind("<j>", self.next_img)
         self.root.bind("<Control-q>", self.exit)
         self.root.bind("<Control-w>", self.exit)
+
+        # Files
         self.root.bind("<Control-s>", self.save_image)
+
+        # View Toggles
         self.root.bind("<b>", self.toggle_bboxes)
         self.root.bind("<Control-b>", self.toggle_bboxes)
         self.root.bind("<m>", self.toggle_masks)
