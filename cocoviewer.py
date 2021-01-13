@@ -30,9 +30,9 @@ class Data:
         instances, images, categories = parse_coco(self.annotations_file)
         self.instances = instances
         self.images = ImageList(images)  # NOTE: image list is based on annotations file
-        self.categories = categories
-        self.nobjects = None
-        self.ncategories = None
+        self.categories = categories  # Dataset categories
+        self.img_obj_categories = None  # as list of category ids of all objects
+        self.img_categories = None  # current image categories (unique sorted category ids)
 
         # Prepare the very first image
         self.current_image = self.images.next()  # Set the first image as current
@@ -50,22 +50,27 @@ class Data:
         # Create layer for bboxes and masks
         draw_layer = Image.new("RGBA", img_open.size, (255, 255, 255, 0))
         draw = ImageDraw.Draw(draw_layer)
-        # Get objects
+
+        # Get objects and category ids
         objects = [obj for obj in self.instances["annotations"] if obj["image_id"] == img_id]
-        obj_categories = [self.categories[obj["category_id"]] for obj in objects]
+        obj_categories_ids = [obj["category_id"] for obj in objects]
+        # Store category id of each object and unique cat ids for the image
+        self.img_obj_categories = [obj["category_id"] for obj in objects]
+        self.img_categories = sorted(list(set(self.img_obj_categories)))
 
-        self.nobjects = len(objects)
-        self.ncategories = len(set([obj["category_id"] for obj in objects]))
+        # Get category name - color pairs for the objects
+        names_colors = [self.categories[i] for i in obj_categories_ids]
 
-        # Prepare masks
+        # Draw masks
         if masks_on:
-            draw_masks(draw, objects, obj_categories)
+            draw_masks(draw, objects, names_colors)
 
         # Draw bounding boxes
         if bboxes_on:
-            draw_bboxes(draw, objects, obj_categories)
+            draw_bboxes(draw, objects, names_colors)
 
         del draw
+
         # Set composed resulting image
         self.current_composed_image = Image.alpha_composite(img_open, draw_layer)
 
@@ -328,8 +333,8 @@ class Controller:
         self.file_count_status.set(f"{str(self.data.images.n + 1)}/{self.data.images.max}")
         self.file_name_status.set(f"{self.data.current_image[-1]}")
         self.description_status.set(f"{self.data.instances.get('info', '').get('description', '')}")
-        self.nobjects_status.set(f"objects: {self.data.nobjects}")
-        self.ncategories_status.set(f"categories: {self.data.ncategories}")
+        self.nobjects_status.set(f"objects: {len(self.data.img_obj_categories)}")
+        self.ncategories_status.set(f"categories: {len(self.data.img_categories)}")
 
     def exit(self, event=None):
         print_info("Exiting...")
@@ -423,6 +428,8 @@ def main():
         return
 
     data = Data(args.images, args.annotations)
+
+    data.compose_current_image()
     statusbar = StatusBar(root)
     objects_panel = ObjectsPanel(root)
     menu = Menu(root)
