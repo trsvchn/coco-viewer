@@ -12,7 +12,7 @@ import logging
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-from PIL import Image, ImageDraw, ImageTk
+from PIL import Image, ImageDraw, ImageTk, ImageFont
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
@@ -152,6 +152,28 @@ def draw_bboxes(draw, objects, obj_categories, ignore, width):
     for i, (c, b) in enumerate(zip(obj_categories, bboxes)):
         if i not in ignore:
             draw.rectangle(b, outline=c[-1], width=width)
+
+            text = c[0]
+            font = ImageFont.truetype("DejaVuSans.ttf", size=20)
+
+            tw, th = draw.textsize(text, font)
+            tx0 = b[0]
+            ty0 = b[1] - th
+
+            # TODO: Looks weird! We need image dims to make it right
+            tx0 = max(b[0], max(b[0], tx0)) if tx0 < 0 else tx0
+            ty0 = max(b[1], max(0, ty0)) if ty0 < 0 else ty0
+
+            tx1 = tx0 + tw
+            ty1 = ty0 + th
+
+            # TODO: The same here
+            if tx1 > b[2]:
+                tx0 = max(0, tx0 - (tx1 - b[2]))
+                tx1 = tw if tx0 == 0 else b[2]
+
+            draw.rectangle((tx0, ty0, tx1, ty1), fill=c[-1])
+            draw.text((tx0, ty0), text, (255, 255, 255), font=font)
 
 
 def draw_masks(draw, objects, obj_categories, ignore, alpha):
