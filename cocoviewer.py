@@ -417,7 +417,9 @@ class Controller:
         self.update_img(bboxes_on=self.bboxes_on_local, masks_on=self.masks_on_local)
 
     def update_category_box(self):
-        self.category_box_content.set(self.data.img_categories)
+        ids = self.data.img_categories
+        names = [self.data.categories[i][0] for i in ids]
+        self.category_box_content.set([" ".join([str(i), str(n)]) for i, n in zip(ids, names)])
         self.objects_panel.category_box.selection_clear(0, tk.END)
         for i in self.selected_cats:
             self.objects_panel.category_box.select_set(i)
@@ -437,7 +439,9 @@ class Controller:
         self.update_img()
 
     def update_object_box(self):
-        self.object_box_content.set(self.data.img_obj_categories)
+        ids = self.data.img_obj_categories
+        names = [self.data.categories[i][0] for i in ids]
+        self.object_box_content.set([" ".join([str(i), str(n)]) for i, n in enumerate(names)])
         self.objects_panel.object_box.selection_clear(0, tk.END)
         for i in self.selected_objs:
             self.objects_panel.object_box.select_set(i)
