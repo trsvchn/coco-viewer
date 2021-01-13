@@ -387,7 +387,7 @@ class Controller:
         )
         # If not canceled:
         if file:
-            self.data.compose_current_image.save(file)
+            self.data.current_composed_image.save(file)
 
     def toggle_bboxes(self, event=None):
         self.bboxes_on_local = not self.bboxes_on_local
@@ -505,8 +505,6 @@ def main():
         return
 
     data = Data(args.images, args.annotations)
-
-    data.compose_current_image()
     statusbar = StatusBar(root)
     objects_panel = ObjectsPanel(root)
     menu = Menu(root)
