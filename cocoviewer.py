@@ -398,6 +398,11 @@ class Controller:
         self.update_img(masks_on=self.masks_on_local)
 
     def toggle_all(self, event=None):
+        # Toggle only when focused on image
+        if event.widget.focus_get() is self.objects_panel.category_box:
+            return
+        if event.widget.focus_get() is self.objects_panel.object_box:
+            return
         # What to toggle
         var_list = [self.bboxes_on_local, self.masks_on_local]
         # if any is on, turn them off
@@ -475,6 +480,7 @@ class Controller:
         # Objects Panel
         self.objects_panel.category_box.bind('<<ListboxSelect>>', self.select_category)
         self.objects_panel.object_box.bind('<<ListboxSelect>>', self.select_object)
+        self.image.image.bind("<Button-1>", lambda e: self.image.focus_set())
 
 
 def print_info(message: str):
