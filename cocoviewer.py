@@ -36,7 +36,6 @@ class Data:
         # Load and prepare the very first image
         self.current_image = self.images.next()  # Set the first image as current
         self.current_composed_image = None  # To store composed PIL Image
-        self.compose_current_image()
 
     def compose_image(self, image: tuple, bboxes_on: bool = True, masks_on: bool = True):
         """Loads image as PIL Image and draw bboxes and/or masks.
