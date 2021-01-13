@@ -271,12 +271,13 @@ class ObjectsPanel(tk.Frame):
 
 
 class Controller:
-    def __init__(self, data, root, image, statusbar, menu):
+    def __init__(self, data, root, image, statusbar, menu, objects_panel):
         self.data = data  # data layer
         self.root = root  # root window
         self.image = image  # image widget
         self.statusbar = statusbar  # statusbar on the bottom
         self.menu = menu  # main menu on the top
+        self.objects_panel = objects_panel
 
         # StatusBar Vars
         self.file_count_status = tk.StringVar()
@@ -305,6 +306,14 @@ class Controller:
         # Init local setup (for the current (active) image)
         self.bboxes_on_local = self.bboxes_on_global.get()
         self.masks_on_local = self.masks_on_global.get()
+
+        # Objects Panel stuff
+        self.category_box_content = tk.StringVar()
+        self.object_box_content = tk.StringVar()
+        # self.categories_to_ignore = []
+        # self.objects_to_ignore = []
+        self.objects_panel.category_box.configure(listvariable=self.category_box_content)
+        self.objects_panel.object_box.configure(listvariable=self.object_box_content)
 
         # Bind all events
         self.bind_events()
@@ -335,6 +344,10 @@ class Controller:
         self.description_status.set(f"{self.data.instances.get('info', '').get('description', '')}")
         self.nobjects_status.set(f"objects: {len(self.data.img_obj_categories)}")
         self.ncategories_status.set(f"categories: {len(self.data.img_categories)}")
+
+        # Update Objects panel
+        self.update_category_box()
+        self.update_object_box()
 
     def exit(self, event=None):
         print_info("Exiting...")
@@ -388,6 +401,14 @@ class Controller:
         # Update image with updated vars
         self.update_img(bboxes_on=self.bboxes_on_local, masks_on=self.masks_on_local)
 
+    def update_category_box(self):
+        self.category_box_content.set(self.data.img_categories)
+        self.objects_panel.category_box.select_set(0, tk.END)
+
+    def update_object_box(self):
+        self.object_box_content.set(self.data.img_obj_categories)
+        self.objects_panel.object_box.select_set(0, tk.END)
+
     def bind_events(self):
         """Binds events.
         """
@@ -434,7 +455,7 @@ def main():
     objects_panel = ObjectsPanel(root)
     menu = Menu(root)
     image = ImageWidget(root)
-    Controller(data, root, image, statusbar, menu)
+    Controller(data, root, image, statusbar, menu, objects_panel)
     root.mainloop()
 
 
