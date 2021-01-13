@@ -42,10 +42,12 @@ class Data:
             self,
             image: tuple,
             bboxes_on: bool = True,
+            labels_on: bool = True,
             masks_on: bool = True,
             ignore: list = None,
             width: int = 1,
             alpha: int = 128,
+            label_size: int = 15,
     ):
         """Loads image as PIL Image and draw bboxes and/or masks.
         """
@@ -76,7 +78,7 @@ class Data:
 
         # Draw bounding boxes
         if bboxes_on:
-            draw_bboxes(draw, objects, names_colors, ignore, width)
+            draw_bboxes(draw, objects, labels_on, names_colors, ignore, width, label_size)
 
         del draw
 
@@ -140,7 +142,7 @@ def get_categories(instances: dict) -> dict:
     return categories
 
 
-def draw_bboxes(draw, objects, obj_categories, ignore, width):
+def draw_bboxes(draw, objects, labels, obj_categories, ignore, width, label_size):
     """Puts rectangles on the image.
     """
     # Extracting bbox coordinates
@@ -153,27 +155,28 @@ def draw_bboxes(draw, objects, obj_categories, ignore, width):
         if i not in ignore:
             draw.rectangle(b, outline=c[-1], width=width)
 
-            text = c[0]
-            font = ImageFont.truetype("DejaVuSans.ttf", size=20)
+            if labels:
+                text = c[0]
+                font = ImageFont.truetype("DejaVuSans.ttf", size=label_size)
 
-            tw, th = draw.textsize(text, font)
-            tx0 = b[0]
-            ty0 = b[1] - th
+                tw, th = draw.textsize(text, font)
+                tx0 = b[0]
+                ty0 = b[1] - th
 
-            # TODO: Looks weird! We need image dims to make it right
-            tx0 = max(b[0], max(b[0], tx0)) if tx0 < 0 else tx0
-            ty0 = max(b[1], max(0, ty0)) if ty0 < 0 else ty0
+                # TODO: Looks weird! We need image dims to make it right
+                tx0 = max(b[0], max(b[0], tx0)) if tx0 < 0 else tx0
+                ty0 = max(b[1], max(0, ty0)) if ty0 < 0 else ty0
 
-            tx1 = tx0 + tw
-            ty1 = ty0 + th
+                tx1 = tx0 + tw
+                ty1 = ty0 + th
 
-            # TODO: The same here
-            if tx1 > b[2]:
-                tx0 = max(0, tx0 - (tx1 - b[2]))
-                tx1 = tw if tx0 == 0 else b[2]
+                # TODO: The same here
+                if tx1 > b[2]:
+                    tx0 = max(0, tx0 - (tx1 - b[2]))
+                    tx1 = tw if tx0 == 0 else b[2]
 
-            draw.rectangle((tx0, ty0, tx1, ty1), fill=c[-1])
-            draw.text((tx0, ty0), text, (255, 255, 255), font=font)
+                draw.rectangle((tx0, ty0, tx1, ty1), fill=c[-1])
+                draw.text((tx0, ty0), text, (255, 255, 255), font=font)
 
 
 def draw_masks(draw, objects, obj_categories, ignore, alpha):
@@ -280,6 +283,7 @@ class Menu(tk.Menu):
         """
         menu = tk.Menu(self, tearoff=False)
         menu.add_checkbutton(label="BBoxes", onvalue=True, offvalue=False)
+        menu.add_checkbutton(label="Labels", onvalue=True, offvalue=False)
         menu.add_checkbutton(label="Masks", onvalue=True, offvalue=False)
         self.add_cascade(label="View", menu=menu)
         return menu
@@ -312,6 +316,10 @@ class SlidersBar(tk.Frame):
         self.bbox_slider = tk.Scale(self, label="bbox", from_=0, to=25, tickinterval=5, orient=tk.HORIZONTAL)
         self.bbox_slider.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
+        # Label text size controller
+        self.label_slider = tk.Scale(self, label="label", from_=10, to=100, tickinterval=25, orient=tk.HORIZONTAL)
+        self.label_slider.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
         # Mask transparency controller
         self.mask_slider = tk.Scale(self, label="mask", from_=0, to=255, tickinterval=25, orient=tk.HORIZONTAL)
         self.mask_slider.pack(side=tk.LEFT, fill=tk.X, expand=True)
@@ -342,17 +350,21 @@ class Controller:
         # Menu Vars
         self.bboxes_on_global = tk.BooleanVar()  # Toggles bboxes globally
         self.bboxes_on_global.set(True)
+        self.labels_on_global = tk.BooleanVar()  # Toggles category labels
+        self.labels_on_global.set(True)
         self.masks_on_global = tk.BooleanVar()  # Toggles masks globally
         self.masks_on_global.set(True)
         # Menu Configuration
         self.menu.file.entryconfigure("Save", command=self.save_image)
         self.menu.file.entryconfigure("Exit", command=self.exit)
         self.menu.view.entryconfigure("BBoxes", variable=self.bboxes_on_global, command=self.update_img)
+        self.menu.view.entryconfigure("Labels", variable=self.labels_on_global, command=self.update_img)
         self.menu.view.entryconfigure("Masks", variable=self.masks_on_global, command=self.update_img)
         self.root.configure(menu=self.menu)
 
         # Init local setup (for the current (active) image)
         self.bboxes_on_local = self.bboxes_on_global.get()
+        self.labels_on_local = self.labels_on_global.get()
         self.masks_on_local = self.masks_on_global.get()
 
         # Objects Panel stuff
@@ -366,10 +378,13 @@ class Controller:
         # Sliders Setup
         self.bbox_thickness = tk.IntVar()
         self.bbox_thickness.set(3)
+        self.label_size = tk.IntVar()
+        self.label_size.set(15)
         self.mask_alpha = tk.IntVar()
         self.mask_alpha.set(128)
-        self.sliders.bbox_slider.configure(variable=self.bbox_thickness, command=self.update_img)
-        self.sliders.mask_slider.configure(variable=self.mask_alpha, command=self.update_img)
+        self.sliders.bbox_slider.configure(variable=self.bbox_thickness, command=lambda e: self.update_img())
+        self.sliders.label_slider.configure(variable=self.label_size, command=lambda e: self.update_img())
+        self.sliders.mask_slider.configure(variable=self.mask_alpha, command=lambda e: self.update_img())
 
         # Bind all events
         self.bind_events()
@@ -377,11 +392,21 @@ class Controller:
         # Compose the very first image
         self.update_img()
 
-    def update_img(self, bboxes_on=None, masks_on=None, width=None, alpha=None):
+    def update_img(
+            self,
+            bboxes_on=None,
+            labels_on=None,
+            masks_on=None,
+            width=None,
+            alpha=None,
+            label_size=None,
+    ):
         """Triggers image composition and sets composed image as current.
         """
         self.bboxes_on_local = self.bboxes_on_global.get() if bboxes_on is None else bboxes_on
+        self.labels_on_local = self.labels_on_global.get() if labels_on is None else labels_on
         self.masks_on_local = self.masks_on_global.get() if masks_on is None else masks_on
+
         if self.selected_objs is None:
             ignore = []
         else:
@@ -389,14 +414,17 @@ class Controller:
 
         width = self.bbox_thickness.get() if width is None else width
         alpha = self.mask_alpha.get() if alpha is None else alpha
+        label_size = self.label_size.get() if label_size is None else label_size
 
         # Compose image
         self.data.compose_current_image(
             bboxes_on=self.bboxes_on_local,
+            labels_on=self.labels_on_local,
             masks_on=self.masks_on_local,
             ignore=ignore,
             width=width,
             alpha=alpha,
+            label_size=label_size,
         )
 
         # Prepare PIL image for Tkinter
@@ -455,6 +483,10 @@ class Controller:
     def toggle_bboxes(self, event=None):
         self.bboxes_on_local = not self.bboxes_on_local
         self.update_img(bboxes_on=self.bboxes_on_local)
+
+    def toggle_labels(self, event=None):
+        self.labels_on_local = not self.labels_on_local
+        self.update_img(labels_on=self.labels_on_local)
 
     def toggle_masks(self, event=None):
         self.masks_on_local = not self.masks_on_local
@@ -546,6 +578,8 @@ class Controller:
         # View Toggles
         self.root.bind("<b>", self.toggle_bboxes)
         self.root.bind("<Control-b>", self.toggle_bboxes)
+        self.root.bind("<l>", self.toggle_labels)
+        self.root.bind("<Control-l>", self.toggle_labels)
         self.root.bind("<m>", self.toggle_masks)
         self.root.bind("<Control-m>", self.toggle_masks)
         self.root.bind("<space>", self.toggle_all)
