@@ -273,12 +273,12 @@ class ObjectsPanel(tk.Frame):
         # Categories subpanel
         tk.Label(self, text="categories", bd=2, bg="gray50").pack(side=tk.TOP, fill=tk.X)
         self.category_box = tk.Listbox(self, selectmode=tk.EXTENDED, exportselection=0)
-        self.category_box.pack(side=tk.TOP, fill=tk.Y)
+        self.category_box.pack(side=tk.TOP, fill=tk.Y, expand=True)
 
         # Objects subpanel
         tk.Label(self, text="objects", bd=2, bg="gray50").pack(side=tk.TOP, fill=tk.X)
         self.object_box = tk.Listbox(self, selectmode=tk.EXTENDED, exportselection=0)
-        self.object_box.pack(side=tk.RIGHT, fill=tk.Y)
+        self.object_box.pack(side=tk.TOP, fill=tk.Y, expand=True)
 
 
 class SlidersBar(tk.Frame):
@@ -343,7 +343,7 @@ class Controller:
 
         # Sliders Setup
         self.bbox_thickness = tk.IntVar()
-        self.bbox_thickness.set(1)
+        self.bbox_thickness.set(3)
         self.mask_alpha = tk.IntVar()
         self.mask_alpha.set(128)
         self.sliders.bbox_slider.configure(variable=self.bbox_thickness, command=self.update_img)
