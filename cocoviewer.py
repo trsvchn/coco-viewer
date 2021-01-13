@@ -220,12 +220,40 @@ class StatusBar(tk.Frame):
         self.ncategories.pack(side=tk.LEFT)
 
 
+class Menu(tk.Menu):
+    def __init__(self, parent):
+        super().__init__(parent)
+        # Define menu structure
+        self.file = self.file_menu()
+        self.view = self.view_menu()
+
+    def file_menu(self):
+        """File Menu.
+        """
+        menu = tk.Menu(self, tearoff=False)
+        menu.add_command(label="Save", accelerator="Ctrl+S")
+        menu.add_separator()
+        menu.add_command(label="Exit", accelerator="Ctrl+Q")
+        self.add_cascade(label="File", menu=menu)
+        return menu
+
+    def view_menu(self):
+        """View Menu.
+        """
+        menu = tk.Menu(self, tearoff=False)
+        menu.add_checkbutton(label="BBoxes", onvalue=True, offvalue=False)
+        menu.add_checkbutton(label="Masks", onvalue=True, offvalue=False)
+        self.add_cascade(label="View", menu=menu)
+        return menu
+
+
 class Controller:
-    def __init__(self, data, root, image, statusbar):
+    def __init__(self, data, root, image, statusbar, menu):
         self.data = data  # data layer
         self.root = root  # root window
         self.image = image  # image widget
         self.statusbar = statusbar  # statusbar on the bottom
+        self.menu = menu  # main menu on the top
 
         # StatusBar Vars
         self.file_count_status = tk.StringVar()
@@ -244,6 +272,12 @@ class Controller:
         self.bboxes_on_global.set(True)
         self.masks_on_global = tk.BooleanVar()  # Toggles masks globally
         self.masks_on_global.set(True)
+        # Menu Configuration
+        self.menu.file.entryconfigure("Save", command=self.save_image)
+        self.menu.file.entryconfigure("Exit", command=self.exit)
+        self.menu.view.entryconfigure("BBoxes", variable=self.bboxes_on_global, command=self.update_img)
+        self.menu.view.entryconfigure("Masks", variable=self.masks_on_global, command=self.update_img)
+        self.root.configure(menu=self.menu)
 
         # Init local setup (for the current (active) image)
         self.bboxes_on_local = self.bboxes_on_global.get()
@@ -353,43 +387,6 @@ class Controller:
         self.root.bind("<space>", self.toggle_all)
 
 
-class Menu(tk.Menu):
-    def __init__(self, parent, controller):
-        super().__init__(parent)
-        self.controller = controller
-        self.file()
-        self.view()
-
-    def file(self):
-        """File Menu.
-        """
-        file_menu = tk.Menu(self, tearoff=0)
-        file_menu.add_command(label="Save", accelerator="Ctrl+S", command=self.controller.save_image)
-        file_menu.add_separator()
-        file_menu.add_command(label="Exit", accelerator="Ctrl+Q", command=self.controller.exit)
-        self.add_cascade(label="File", menu=file_menu)
-
-    def view(self):
-        """View Menu.
-        """
-        view_menu = tk.Menu(self, tearoff=0)
-        view_menu.add_checkbutton(
-            label="BBoxes",
-            onvalue=True,
-            offvalue=False,
-            variable=self.controller.bboxes_on_global,
-            command=self.controller.update_img,
-        )
-        view_menu.add_checkbutton(
-            label="Masks",
-            onvalue=True,
-            offvalue=False,
-            variable=self.controller.masks_on_global,
-            command=self.controller.update_img,
-        )
-        self.add_cascade(label="View", menu=view_menu)
-
-
 def print_info(message: str):
     logging.info(message)
 
@@ -408,12 +405,10 @@ def main():
         return
 
     data = Data(args.images, args.annotations)
-
     statusbar = StatusBar(root)
+    menu = Menu(root)
     image = ImageWidget(root)
-    controller = Controller(data, root, image, statusbar)
-    menu = Menu(root, controller)
-    root.config(menu=menu)
+    Controller(data, root, image, statusbar, menu)
     root.mainloop()
 
 
