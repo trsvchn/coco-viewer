@@ -51,7 +51,6 @@ class Data:
     ):
         """Loads image as PIL Image and draw bboxes and/or masks.
         """
-        # TODO: labels for object classes
         # TODO: predicted bboxes drawing (from models)
         img_id, img_name = image
         full_path = os.path.join(self.image_dir, img_name)
@@ -397,6 +396,9 @@ class Controller:
         self.labels_on_local = self.labels_on_global.get()
         self.masks_on_local = self.masks_on_global.get()
 
+        # Update sliders
+        self.update_sliders_state()
+
     def update_img(self, local=True, width=None, alpha=None, label_size=None):
         """Triggers image composition and sets composed image as current.
         """
@@ -481,22 +483,27 @@ class Controller:
 
     def menu_view_bboxes(self):
         self.bboxes_on_local = self.bboxes_on_global.get()
+        self.bbox_slider_status_update()
         self.update_img()
 
     def menu_view_labels(self):
         self.labels_on_local = self.labels_on_global.get()
+        self.label_slider_status_update()
         self.update_img()
 
     def menu_view_masks(self):
         self.masks_on_local = self.masks_on_global.get()
+        self.masks_slider_status_update()
         self.update_img()
 
     def toggle_bboxes(self, event=None):
         self.bboxes_on_local = not self.bboxes_on_local
+        self.bbox_slider_status_update()
         self.update_img()
 
     def toggle_labels(self, event=None):
         self.labels_on_local = not self.labels_on_local
+        self.label_slider_status_update()
         self.update_img()
 
     def toggle_masks(self, event=None):
@@ -521,6 +528,9 @@ class Controller:
             self.bboxes_on_local = True
             self.labels_on_local = True
             self.masks_on_local = True
+
+        # Update sliders
+        self.update_sliders_state()
         # Update image with updated vars
         self.update_img()
 
@@ -573,6 +583,20 @@ class Controller:
                     selected_cats.append(i)
         self.selected_cats = selected_cats
         self.update_img()
+
+    def update_sliders_state(self):
+        self.bbox_slider_status_update()
+        self.label_slider_status_update()
+        self.masks_slider_status_update()
+
+    def bbox_slider_status_update(self):
+        self.sliders.bbox_slider.configure(state=tk.NORMAL if self.bboxes_on_local else tk.DISABLED)
+
+    def label_slider_status_update(self):
+        self.sliders.label_slider.configure(state=tk.NORMAL if self.labels_on_local else tk.DISABLED)
+
+    def masks_slider_status_update(self):
+        self.sliders.mask_slider.configure(state=tk.NORMAL if self.masks_on_local else tk.DISABLED)
 
     def bind_events(self):
         """Binds events.
