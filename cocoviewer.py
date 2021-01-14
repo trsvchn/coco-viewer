@@ -321,7 +321,7 @@ class SlidersBar(tk.Frame):
         self.label_slider.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         # Mask transparency controller
-        self.mask_slider = tk.Scale(self, label="mask", from_=0, to=255, tickinterval=25, orient=tk.HORIZONTAL)
+        self.mask_slider = tk.Scale(self, label="mask", from_=0, to=255, tickinterval=50, orient=tk.HORIZONTAL)
         self.mask_slider.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
 
@@ -357,9 +357,9 @@ class Controller:
         # Menu Configuration
         self.menu.file.entryconfigure("Save", command=self.save_image)
         self.menu.file.entryconfigure("Exit", command=self.exit)
-        self.menu.view.entryconfigure("BBoxes", variable=self.bboxes_on_global, command=self.update_img)
-        self.menu.view.entryconfigure("Labels", variable=self.labels_on_global, command=self.update_img)
-        self.menu.view.entryconfigure("Masks", variable=self.masks_on_global, command=self.update_img)
+        self.menu.view.entryconfigure("BBoxes", variable=self.bboxes_on_global, command=self.menu_view_bboxes)
+        self.menu.view.entryconfigure("Labels", variable=self.labels_on_global, command=self.menu_view_labels)
+        self.menu.view.entryconfigure("Masks", variable=self.masks_on_global, command=self.menu_view_masks)
         self.root.configure(menu=self.menu)
 
         # Init local setup (for the current (active) image)
@@ -392,20 +392,17 @@ class Controller:
         # Compose the very first image
         self.update_img()
 
-    def update_img(
-            self,
-            bboxes_on=None,
-            labels_on=None,
-            masks_on=None,
-            width=None,
-            alpha=None,
-            label_size=None,
-    ):
+    def set_locals(self):
+        self.bboxes_on_local = self.bboxes_on_global.get()
+        self.labels_on_local = self.labels_on_global.get()
+        self.masks_on_local = self.masks_on_global.get()
+
+    def update_img(self, local=True, width=None, alpha=None, label_size=None):
         """Triggers image composition and sets composed image as current.
         """
-        self.bboxes_on_local = self.bboxes_on_global.get() if bboxes_on is None else bboxes_on
-        self.labels_on_local = self.labels_on_global.get() if labels_on is None else labels_on
-        self.masks_on_local = self.masks_on_global.get() if masks_on is None else masks_on
+        bboxes_on = self.bboxes_on_local if local else self.bboxes_on_global.get()
+        labels_on = self.labels_on_local if local else self.labels_on_global.get()
+        masks_on = self.masks_on_local if local else self.masks_on_global.get()
 
         if self.selected_objs is None:
             ignore = []
@@ -418,9 +415,9 @@ class Controller:
 
         # Compose image
         self.data.compose_current_image(
-            bboxes_on=self.bboxes_on_local,
-            labels_on=self.labels_on_local,
-            masks_on=self.masks_on_local,
+            bboxes_on=bboxes_on,
+            labels_on=labels_on,
+            masks_on=masks_on,
             ignore=ignore,
             width=width,
             alpha=alpha,
@@ -452,15 +449,17 @@ class Controller:
 
     def next_img(self, event=None):
         self.data.next_image()
+        self.set_locals()
         self.selected_cats = None
         self.selected_objs = None
-        self.update_img()
+        self.update_img(local=False)
 
     def prev_img(self, event=None):
         self.data.previous_image()
+        self.set_locals()
         self.selected_cats = None
         self.selected_objs = None
-        self.update_img()
+        self.update_img(local=False)
 
     def save_image(self, event=None):
         """Saves composed image as png file.
@@ -480,17 +479,29 @@ class Controller:
         if file:
             self.data.current_composed_image.save(file)
 
+    def menu_view_bboxes(self):
+        self.bboxes_on_local = self.bboxes_on_global.get()
+        self.update_img()
+
+    def menu_view_labels(self):
+        self.labels_on_local = self.labels_on_global.get()
+        self.update_img()
+
+    def menu_view_masks(self):
+        self.masks_on_local = self.masks_on_global.get()
+        self.update_img()
+
     def toggle_bboxes(self, event=None):
         self.bboxes_on_local = not self.bboxes_on_local
-        self.update_img(bboxes_on=self.bboxes_on_local)
+        self.update_img()
 
     def toggle_labels(self, event=None):
         self.labels_on_local = not self.labels_on_local
-        self.update_img(labels_on=self.labels_on_local)
+        self.update_img()
 
     def toggle_masks(self, event=None):
         self.masks_on_local = not self.masks_on_local
-        self.update_img(masks_on=self.masks_on_local)
+        self.update_img()
 
     def toggle_all(self, event=None):
         # Toggle only when focused on image
@@ -499,17 +510,19 @@ class Controller:
         if event.widget.focus_get() is self.objects_panel.object_box:
             return
         # What to toggle
-        var_list = [self.bboxes_on_local, self.masks_on_local]
+        var_list = [self.bboxes_on_local, self.labels_on_local, self.masks_on_local]
         # if any is on, turn them off
         if True in set(var_list):
             self.bboxes_on_local = False
+            self.labels_on_local = False
             self.masks_on_local = False
         # if all is off, turn them on
         else:
             self.bboxes_on_local = True
+            self.labels_on_local = True
             self.masks_on_local = True
         # Update image with updated vars
-        self.update_img(bboxes_on=self.bboxes_on_local, masks_on=self.masks_on_local)
+        self.update_img()
 
     def update_category_box(self):
         ids = self.data.img_categories
@@ -585,8 +598,8 @@ class Controller:
         self.root.bind("<space>", self.toggle_all)
 
         # Objects Panel
-        self.objects_panel.category_box.bind('<<ListboxSelect>>', self.select_category)
-        self.objects_panel.object_box.bind('<<ListboxSelect>>', self.select_object)
+        self.objects_panel.category_box.bind("<<ListboxSelect>>", self.select_category)
+        self.objects_panel.object_box.bind("<<ListboxSelect>>", self.select_object)
         self.image.image.bind("<Button-1>", lambda e: self.image.focus_set())
 
 
