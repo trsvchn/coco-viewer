@@ -290,7 +290,7 @@ class Menu(tk.Menu):
         return menu
 
 
-class ObjectsPanel(ttk.Frame):
+class ObjectsPanel(ttk.PanedWindow):
     """Panels with listed objects and categories for the image.
     """
     def __init__(self, parent):
@@ -298,14 +298,18 @@ class ObjectsPanel(ttk.Frame):
         self.pack(side=tk.RIGHT, fill=tk.Y)
 
         # Categories subpanel
-        ttk.Label(self, text="categories", borderwidth=2, background="gray50").pack(side=tk.TOP, fill=tk.X)
-        self.category_box = tk.Listbox(self, selectmode=tk.EXTENDED, exportselection=0)
+        self.category_subpanel = ttk.Frame()
+        ttk.Label(self.category_subpanel, text="categories", borderwidth=2, background="gray50").pack(side=tk.TOP, fill=tk.X)
+        self.category_box = tk.Listbox(self.category_subpanel, selectmode=tk.EXTENDED, exportselection=0)
         self.category_box.pack(side=tk.TOP, fill=tk.Y, expand=True)
+        self.add(self.category_subpanel)
 
         # Objects subpanel
-        ttk.Label(self, text="objects", borderwidth=2, background="gray50").pack(side=tk.TOP, fill=tk.X)
-        self.object_box = tk.Listbox(self, selectmode=tk.EXTENDED, exportselection=0)
+        self.object_subpanel = ttk.Frame()
+        ttk.Label(self.object_subpanel, text="objects", borderwidth=2, background="gray50").pack(side=tk.TOP, fill=tk.X)
+        self.object_box = tk.Listbox(self.object_subpanel, selectmode=tk.EXTENDED, exportselection=0)
         self.object_box.pack(side=tk.TOP, fill=tk.Y, expand=True)
+        self.add(self.object_subpanel)
 
 
 class SlidersBar(ttk.Frame):
