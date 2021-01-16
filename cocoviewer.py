@@ -10,6 +10,8 @@ import colorsys
 import json
 import logging
 import tkinter as tk
+import tkinter.ttk as ttk
+
 from tkinter import filedialog, messagebox
 
 from PIL import Image, ImageDraw, ImageTk, ImageFont
@@ -229,34 +231,34 @@ class ImageList:
         return current_image
 
 
-class ImageWidget(tk.Frame):
+class ImageWidget(ttk.Frame):
     """Main Image Widget that displays composed image.
     """
     def __init__(self, parent):
         super().__init__(parent)
         self.pack()
 
-        self.image = tk.Label(self)
+        self.image = ttk.Label(self)
         self.image.pack(side=tk.TOP)
 
 
-class StatusBar(tk.Frame):
+class StatusBar(ttk.Frame):
     """Shows status line on the bottom.
     """
     def __init__(self, parent):
         super().__init__(parent)
-        self.configure(bg="gray75")
+        # self.configure(bd="gray75")
         self.pack(side=tk.BOTTOM, fill=tk.X)
 
-        self.file_count = tk.Label(self, bd=5, bg="gray75")
+        self.file_count = ttk.Label(self, borderwidth=5, background="gray75")
         self.file_count.pack(side=tk.RIGHT)
-        self.description = tk.Label(self, bd=5, bg="gray75")
+        self.description = ttk.Label(self, borderwidth=5, background="gray75")
         self.description.pack(side=tk.RIGHT)
-        self.file_name = tk.Label(self, bd=5, bg="gray75")
+        self.file_name = ttk.Label(self, borderwidth=5, background="gray75")
         self.file_name.pack(side=tk.LEFT)
-        self.nobjects = tk.Label(self, bd=5, bg="gray75")
+        self.nobjects = ttk.Label(self, borderwidth=5, background="gray75")
         self.nobjects.pack(side=tk.LEFT)
-        self.ncategories = tk.Label(self, bd=5, bg="gray75")
+        self.ncategories = ttk.Label(self, borderwidth=5, background="gray75")
         self.ncategories.pack(side=tk.LEFT)
 
 
@@ -288,7 +290,7 @@ class Menu(tk.Menu):
         return menu
 
 
-class ObjectsPanel(tk.Frame):
+class ObjectsPanel(ttk.PanedWindow):
     """Panels with listed objects and categories for the image.
     """
     def __init__(self, parent):
@@ -296,17 +298,21 @@ class ObjectsPanel(tk.Frame):
         self.pack(side=tk.RIGHT, fill=tk.Y)
 
         # Categories subpanel
-        tk.Label(self, text="categories", bd=2, bg="gray50").pack(side=tk.TOP, fill=tk.X)
-        self.category_box = tk.Listbox(self, selectmode=tk.EXTENDED, exportselection=0)
+        self.category_subpanel = ttk.Frame()
+        ttk.Label(self.category_subpanel, text="categories", borderwidth=2, background="gray50").pack(side=tk.TOP, fill=tk.X)
+        self.category_box = tk.Listbox(self.category_subpanel, selectmode=tk.EXTENDED, exportselection=0)
         self.category_box.pack(side=tk.TOP, fill=tk.Y, expand=True)
+        self.add(self.category_subpanel)
 
         # Objects subpanel
-        tk.Label(self, text="objects", bd=2, bg="gray50").pack(side=tk.TOP, fill=tk.X)
-        self.object_box = tk.Listbox(self, selectmode=tk.EXTENDED, exportselection=0)
+        self.object_subpanel = ttk.Frame()
+        ttk.Label(self.object_subpanel, text="objects", borderwidth=2, background="gray50").pack(side=tk.TOP, fill=tk.X)
+        self.object_box = tk.Listbox(self.object_subpanel, selectmode=tk.EXTENDED, exportselection=0)
         self.object_box.pack(side=tk.TOP, fill=tk.Y, expand=True)
+        self.add(self.object_subpanel)
 
 
-class SlidersBar(tk.Frame):
+class SlidersBar(ttk.Frame):
     def __init__(self, parent):
         super().__init__(parent)
         self.pack(side=tk.BOTTOM, fill=tk.X)
