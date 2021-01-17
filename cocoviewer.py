@@ -11,8 +11,8 @@ import json
 import logging
 import tkinter as tk
 import tkinter.ttk as ttk
-
 from tkinter import filedialog, messagebox
+from turtle import __forwardmethods
 
 from PIL import Image, ImageDraw, ImageTk, ImageFont
 
@@ -231,15 +231,94 @@ class ImageList:
         return current_image
 
 
-class ImageWidget(ttk.Frame):
-    """Main Image Widget that displays composed image.
+class ImagePanel(ttk.Frame):
+    """ttk port of original turtle.ScrolledCanvas code.
     """
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.pack()
+    def __init__(self, parent, width=768, height=480, canvwidth=600, canvheight=500):
+        super().__init__(parent, width=width, height=height)
+        self._rootwindow = self.winfo_toplevel()
+        self.width, self.height = width, height
+        self.canvwidth, self.canvheight = canvwidth, canvheight
+        self.bg = "gray15"
+        self.pack(fill=tk.BOTH, expand=True)
 
-        self.image = ttk.Label(self)
-        self.image.pack(side=tk.TOP)
+        self._canvas = tk.Canvas(parent, width=width, height=height, bg=self.bg, relief="sunken", borderwidth=2)
+        self.hscroll = ttk.Scrollbar(parent, command=self._canvas.xview, orient=tk.HORIZONTAL)
+        self.vscroll = ttk.Scrollbar(parent, command=self._canvas.yview)
+        self._canvas.configure(xscrollcommand=self.hscroll.set, yscrollcommand=self.vscroll.set)
+
+        self.rowconfigure(0, weight=1, minsize=0)
+        self.columnconfigure(0, weight=1, minsize=0)
+        self._canvas.grid(padx=1, in_=self, pady=1, row=0, column=0, rowspan=1, columnspan=1, sticky=tk.NSEW)
+        self.vscroll.grid(padx=1, in_=self, pady=1, row=0, column=1, rowspan=1, columnspan=1, sticky=tk.NSEW)
+        self.hscroll.grid(padx=1, in_=self, pady=1, row=1, column=0, rowspan=1, columnspan=1, sticky=tk.NSEW)
+
+        self.reset()
+        self._rootwindow.bind("<Configure>", self.on_resize)
+
+    def reset(self, canvwidth=None, canvheight=None, bg=None):
+        """Adjusts canvas and scrollbars according to given canvas size.
+        """
+        if canvwidth:
+            self.canvwidth = canvwidth
+        if canvheight:
+            self.canvheight = canvheight
+        if bg:
+            self.bg = bg
+        self._canvas.config(
+            bg=bg,
+            scrollregion=(
+                -self.canvwidth // 2,
+                -self.canvheight // 2,
+                self.canvwidth // 2,
+                self.canvheight // 2,
+            ),
+        )
+        self._canvas.xview_moveto(0.5 * (self.canvwidth - self.width + 30) / self.canvwidth)
+        self._canvas.yview_moveto(0.5 * (self.canvheight - self.height + 30) / self.canvheight)
+        self.adjust_scrolls()
+
+    def adjust_scrolls(self):
+        """Adjusts scrollbars according to window- and canvas-size.
+        """
+        cwidth = self._canvas.winfo_width()
+        cheight = self._canvas.winfo_height()
+
+        self._canvas.xview_moveto(0.5 * (self.canvwidth - cwidth) / self.canvwidth)
+        self._canvas.yview_moveto(0.5 * (self.canvheight - cheight) / self.canvheight)
+
+        if cwidth < self.canvwidth:
+            self.hscroll.grid(padx=1, in_=self, pady=1, row=1, column=0, rowspan=1, columnspan=1, sticky=tk.NSEW)
+        else:
+            self.hscroll.grid_forget()
+        if cheight < self.canvheight:
+            self.vscroll.grid(padx=1, in_=self, pady=1, row=0, column=1, rowspan=1, columnspan=1, sticky=tk.NSEW)
+        else:
+            self.vscroll.grid_forget()
+
+    def on_resize(self, event):
+        self.adjust_scrolls()
+
+    def bbox(self, *args):
+        return self._canvas.bbox(*args)
+
+    def cget(self, *args, **kwargs):
+        return self._canvas.cget(*args, **kwargs)
+
+    def config(self, *args, **kwargs):
+        self._canvas.config(*args, **kwargs)
+
+    def bind(self, *args, **kwargs):
+        self._canvas.bind(*args, **kwargs)
+
+    def unbind(self, *args, **kwargs):
+        self._canvas.unbind(*args, **kwargs)
+
+    def focus_force(self):
+        self._canvas.focus_force()
+
+
+__forwardmethods(ImagePanel, tk.Canvas, "_canvas")
 
 
 class StatusBar(ttk.Frame):
@@ -331,10 +410,10 @@ class SlidersBar(ttk.Frame):
 
 
 class Controller:
-    def __init__(self, data, root, image, statusbar, menu, objects_panel, sliders):
+    def __init__(self, data, root, image_panel, statusbar, menu, objects_panel, sliders):
         self.data = data  # data layer
         self.root = root  # root window
-        self.image = image  # image widget
+        self.image_panel = image_panel  # image panel
         self.statusbar = statusbar  # statusbar on the bottom
         self.menu = menu  # main menu on the top
         self.objects_panel = objects_panel
@@ -434,11 +513,13 @@ class Controller:
 
         # Prepare PIL image for Tkinter
         img = self.data.current_composed_image
+        w, h = img.size
         img = ImageTk.PhotoImage(img)
 
         # Set image as current
-        self.image.image.configure(image=img)
-        self.image.image.image = img
+        self.image_panel.create_image(0, 0, image=img)
+        self.image_panel.image = img
+        self.image_panel.reset(canvwidth=w, canvheight=h)
 
         # Update statusbar vars
         self.file_count_status.set(f"{str(self.data.images.n + 1)}/{self.data.images.max}")
@@ -630,7 +711,7 @@ class Controller:
         # Objects Panel
         self.objects_panel.category_box.bind("<<ListboxSelect>>", self.select_category)
         self.objects_panel.object_box.bind("<<ListboxSelect>>", self.select_object)
-        self.image.image.bind("<Button-1>", lambda e: self.image.focus_set())
+        self.image_panel.bind("<Button-1>", lambda e: self.image_panel.focus_set())
 
 
 def print_info(message: str):
@@ -655,8 +736,8 @@ def main():
     sliders = SlidersBar(root)
     objects_panel = ObjectsPanel(root)
     menu = Menu(root)
-    image = ImageWidget(root)
-    Controller(data, root, image, statusbar, menu, objects_panel, sliders)
+    image_panel = ImagePanel(root)
+    Controller(data, root, image_panel, statusbar, menu, objects_panel, sliders)
     root.mainloop()
 
 
