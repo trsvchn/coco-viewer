@@ -28,78 +28,44 @@ class Data:
     """
     def __init__(self, image_dir, annotations_file):
         self.image_dir = image_dir
-        self.annotations_file = annotations_file
-        instances, images, categories = parse_coco(self.annotations_file)
+        instances, images, categories = parse_coco(annotations_file)
         self.instances = instances
         self.images = ImageList(images)  # NOTE: image list is based on annotations file
         self.categories = categories  # Dataset categories
-        self.img_obj_categories = None  # as list of category ids of all objects
-        self.img_categories = None  # current image categories (unique sorted category ids)
 
         # Prepare the very first image
         self.current_image = self.images.next()  # Set the first image as current
-        self.current_composed_image = None  # To store composed PIL Image
 
-    def compose_image(
-            self,
-            image: tuple,
-            bboxes_on: bool = True,
-            labels_on: bool = True,
-            masks_on: bool = True,
-            ignore: list = None,
-            width: int = 1,
-            alpha: int = 128,
-            label_size: int = 15,
-    ):
-        """Loads image as PIL Image and draw bboxes and/or masks.
+    def prepare_image(self):
+        """Prepares image path, objects, colors.
         """
         # TODO: predicted bboxes drawing (from models)
-        img_id, img_name = image
+        img_id, img_name = self.current_image
         full_path = os.path.join(self.image_dir, img_name)
-        ignore = ignore or []  # list of objects to ignore
-        # Open image
-        img_open = Image.open(full_path).convert("RGBA")
-        # Create layer for bboxes and masks
-        draw_layer = Image.new("RGBA", img_open.size, (255, 255, 255, 0))
-        draw = ImageDraw.Draw(draw_layer)
 
         # Get objects and category ids
         objects = [obj for obj in self.instances["annotations"] if obj["image_id"] == img_id]
         obj_categories_ids = [obj["category_id"] for obj in objects]
-        # Store category id of each object and unique cat ids for the image
-        self.img_obj_categories = [obj["category_id"] for obj in objects]
-        self.img_categories = sorted(list(set(self.img_obj_categories)))
 
-        # Get category name - color pairs for the objects
+        # List of category ids of all objects
+        img_obj_categories = [obj["category_id"] for obj in objects]
+        # Current image categories (unique sorted category ids)
+        img_categories = sorted(list(set(img_obj_categories)))
+
+        # Get category name-color pairs for the objects
         names_colors = [self.categories[i] for i in obj_categories_ids]
 
-        # Draw masks
-        if masks_on:
-            draw_masks(draw, objects, names_colors, ignore, alpha)
+        return full_path, objects, names_colors, img_obj_categories, img_categories
 
-        # Draw bounding boxes
-        if bboxes_on:
-            draw_bboxes(draw, objects, labels_on, names_colors, ignore, width, label_size)
-
-        del draw
-
-        # Set composed resulting image
-        self.current_composed_image = Image.alpha_composite(img_open, draw_layer)
-
-    def compose_current_image(self, **kwargs):
-        self.compose_image(self.current_image, **kwargs)
-
-    def next_image(self, **kwargs):
+    def next_image(self):
         """Loads the next image in a list.
         """
         self.current_image = self.images.next()
-        self.compose_current_image(**kwargs)
 
-    def previous_image(self, **kwargs):
+    def previous_image(self):
         """Loads the previous image in a list.
         """
         self.current_image = self.images.prev()
-        self.compose_current_image(**kwargs)
 
 
 def parse_coco(annotations_file: str) -> tuple:
@@ -125,6 +91,17 @@ def get_images(instances: dict) -> list:
     """Extracts all image ids and file names from annotations file.
     """
     return [(image["id"], image["file_name"]) for image in instances["images"]]
+
+
+def open_image(full_img_path: str):
+    """Opens image, creates draw context.
+    """
+    # Open image
+    img_open = Image.open(full_img_path).convert("RGBA")
+    # Create layer for bboxes and masks
+    draw_layer = Image.new("RGBA", img_open.size, (255, 255, 255, 0))
+    draw = ImageDraw.Draw(draw_layer)
+    return img_open, draw_layer, draw
 
 
 def get_categories(instances: dict) -> dict:
@@ -474,6 +451,9 @@ class Controller:
         self.bind_events()
 
         # Compose the very first image
+        self.current_composed_image = None
+        self.current_img_obj_categories = None
+        self.current_img_categories = None
         self.update_img()
 
     def set_locals(self):
@@ -484,6 +464,31 @@ class Controller:
         # Update sliders
         self.update_sliders_state()
 
+    def compose_image(
+            self,
+            full_path,
+            objects,
+            names_colors,
+            bboxes_on: bool = True,
+            labels_on: bool = True,
+            masks_on: bool = True,
+            ignore: list = None,
+            width: int = 1,
+            alpha: int = 128,
+            label_size: int = 15,
+    ):
+        ignore = ignore or []  # list of objects to ignore
+        img_open, draw_layer, draw = open_image(full_path)
+        # Draw masks
+        if masks_on:
+            draw_masks(draw, objects, names_colors, ignore, alpha)
+        # Draw bounding boxes
+        if bboxes_on:
+            draw_bboxes(draw, objects, labels_on, names_colors, ignore, width, label_size)
+        del draw
+        # Resulting image
+        self.current_composed_image = Image.alpha_composite(img_open, draw_layer)
+
     def update_img(self, local=True, width=None, alpha=None, label_size=None):
         """Triggers image composition and sets composed image as current.
         """
@@ -491,17 +496,25 @@ class Controller:
         labels_on = self.labels_on_local if local else self.labels_on_global.get()
         masks_on = self.masks_on_local if local else self.masks_on_global.get()
 
+        # Prepare image
+        full_path, objects, names_colors, img_obj_categories, img_categories = self.data.prepare_image()
+        self.current_img_obj_categories = img_obj_categories
+        self.current_img_categories = img_categories
+
         if self.selected_objs is None:
             ignore = []
         else:
-            ignore = [i for i in range(len(self.data.img_obj_categories)) if i not in self.selected_objs]
+            ignore = [i for i in range(len(self.current_img_obj_categories)) if i not in self.selected_objs]
 
         width = self.bbox_thickness.get() if width is None else width
         alpha = self.mask_alpha.get() if alpha is None else alpha
         label_size = self.label_size.get() if label_size is None else label_size
 
         # Compose image
-        self.data.compose_current_image(
+        self.compose_image(
+            full_path=full_path,
+            objects=objects,
+            names_colors=names_colors,
             bboxes_on=bboxes_on,
             labels_on=labels_on,
             masks_on=masks_on,
@@ -512,7 +525,7 @@ class Controller:
         )
 
         # Prepare PIL image for Tkinter
-        img = self.data.current_composed_image
+        img = self.current_composed_image
         w, h = img.size
         img = ImageTk.PhotoImage(img)
 
@@ -525,8 +538,8 @@ class Controller:
         self.file_count_status.set(f"{str(self.data.images.n + 1)}/{self.data.images.max}")
         self.file_name_status.set(f"{self.data.current_image[-1]}")
         self.description_status.set(f"{self.data.instances.get('info', '').get('description', '')}")
-        self.nobjects_status.set(f"objects: {len(self.data.img_obj_categories)}")
-        self.ncategories_status.set(f"categories: {len(self.data.img_categories)}")
+        self.nobjects_status.set(f"objects: {len(self.current_img_obj_categories)}")
+        self.ncategories_status.set(f"categories: {len(self.current_img_categories)}")
 
         # Update Objects panel
         self.update_category_box()
@@ -622,7 +635,7 @@ class Controller:
         self.update_img()
 
     def update_category_box(self):
-        ids = self.data.img_categories
+        ids = self.current_img_categories
         names = [self.data.categories[i][0] for i in ids]
         self.category_box_content.set([" ".join([str(i), str(n)]) for i, n in zip(ids, names)])
         self.objects_panel.category_box.selection_clear(0, tk.END)
@@ -640,14 +653,14 @@ class Controller:
         # Set selected_objs
         selected_objs = []
         for ci in self.selected_cats:
-            for i, o in enumerate(self.data.img_obj_categories):
-                if self.data.img_categories[ci] == o:
+            for i, o in enumerate(self.current_img_obj_categories):
+                if self.current_img_categories[ci] == o:
                     selected_objs.append(i)
         self.selected_objs = selected_objs
         self.update_img()
 
     def update_object_box(self):
-        ids = self.data.img_obj_categories
+        ids = self.current_img_obj_categories
         names = [self.data.categories[i][0] for i in ids]
         self.object_box_content.set([" ".join([str(i), str(n)]) for i, n in enumerate(names)])
         self.objects_panel.object_box.selection_clear(0, tk.END)
@@ -665,8 +678,8 @@ class Controller:
         # Set selected_objs
         selected_cats = []
         for oi in self.selected_objs:
-            for i, c in enumerate(self.data.img_categories):
-                if self.data.img_obj_categories[oi] == c:
+            for i, c in enumerate(self.current_img_categories):
+                if self.current_img_obj_categories[oi] == c:
                     selected_cats.append(i)
         self.selected_cats = selected_cats
         self.update_img()
