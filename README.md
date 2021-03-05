@@ -1,8 +1,8 @@
-# Local COCO Viewer
+# COCO Viewer
 
-> Simple COCO Objects Viewer in Tkinter. Allows quick viewing on local machine.
+Simple COCO Objects Viewer in Tkinter. Allows quick viewing on local machine.
 
-![Example images](examples/example.jpg)
+![Example images](assets/img1.png)
 
 ## Requirements
 `python3` `PIL`
