@@ -618,7 +618,7 @@ class Controller:
         )
         # If not canceled:
         if file:
-            self.data.current_composed_image.save(file)
+            self.current_composed_image.save(file)
 
     def menu_view_bboxes(self):
         self.bboxes_on_local = self.bboxes_on_global.get()
