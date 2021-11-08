@@ -104,17 +104,28 @@ def open_image(full_img_path: str):
     return img_open, draw_layer, draw
 
 
+def prepare_colors(n_objects: int, shuffle: bool = True) -> list:
+    """Get some colors.
+    """
+    # Get some colors
+    hsv_tuples = [(x / n_objects, 1., 1.) for x in range(n_objects)]
+    colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
+    colors = list(map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)), colors))
+
+    # Shuffle colors
+    if shuffle:
+        random.seed(42)
+        random.shuffle(colors)
+        random.seed(None)
+
+    return colors
+
+
 def get_categories(instances: dict) -> dict:
     """Extracts categories from annotations file and prepares color for each one.
     """
-    # Get some colors
-    hsv_tuples = [(x / 80, 1., 1.) for x in range(80)]
-    colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
-    colors = list(map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)), colors))
-    random.seed(42)
-    random.shuffle(colors)
-    random.seed(None)
     # Parse categories
+    colors = prepare_colors(n_objects=80, shuffle=True)
     categories = list(zip([[category["id"], category["name"]] for category in instances["categories"]], colors))
     categories = dict([[cat[0][0], [cat[0][1], cat[1]]] for cat in categories])
     return categories
