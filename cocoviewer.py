@@ -539,7 +539,7 @@ class Controller:
         # Update statusbar vars
         self.file_count_status.set(f"{str(self.data.images.n + 1)}/{self.data.images.max}")
         self.file_name_status.set(f"{self.data.current_image[-1]}")
-        self.description_status.set(f"{self.data.instances.get('info', '').get('description', '')}")
+        self.description_status.set(f"{self.data.instances.get('info', {}).get('description', '')}")
         self.nobjects_status.set(f"objects: {len(self.current_img_obj_categories)}")
         self.ncategories_status.set(f"categories: {len(self.current_img_categories)}")
 
