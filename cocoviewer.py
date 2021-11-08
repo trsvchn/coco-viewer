@@ -36,7 +36,7 @@ class Data:
         # Prepare the very first image
         self.current_image = self.images.next()  # Set the first image as current
 
-    def prepare_image(self):
+    def prepare_image(self, object_based_coloring: bool = False):
         """Prepares image path, objects, colors.
         """
         # TODO: predicted bboxes drawing (from models)
@@ -54,6 +54,19 @@ class Data:
 
         # Get category name-color pairs for the objects
         names_colors = [self.categories[i] for i in obj_categories_ids]
+
+        # Objects based coloring (instances)
+        if object_based_coloring:
+            names_colors_obj = []
+
+            # Get new colors for the image
+            obj_colors = prepare_colors(len(objects))
+
+            # Update name-color pairs
+            for i in range(len(objects)):
+                names_colors_obj.append([names_colors[i][0], obj_colors[i]])
+
+            names_colors = names_colors_obj
 
         return full_path, objects, names_colors, img_obj_categories, img_categories
 
@@ -104,17 +117,28 @@ def open_image(full_img_path: str):
     return img_open, draw_layer, draw
 
 
+def prepare_colors(n_objects: int, shuffle: bool = True) -> list:
+    """Get some colors.
+    """
+    # Get some colors
+    hsv_tuples = [(x / n_objects, 1., 1.) for x in range(n_objects)]
+    colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
+    colors = list(map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)), colors))
+
+    # Shuffle colors
+    if shuffle:
+        random.seed(42)
+        random.shuffle(colors)
+        random.seed(None)
+
+    return colors
+
+
 def get_categories(instances: dict) -> dict:
     """Extracts categories from annotations file and prepares color for each one.
     """
-    # Get some colors
-    hsv_tuples = [(x / 80, 1., 1.) for x in range(80)]
-    colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
-    colors = list(map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)), colors))
-    random.seed(42)
-    random.shuffle(colors)
-    random.seed(None)
     # Parse categories
+    colors = prepare_colors(n_objects=80, shuffle=True)
     categories = list(zip([[category["id"], category["name"]] for category in instances["categories"]], colors))
     categories = dict([[cat[0][0], [cat[0][1], cat[1]]] for cat in categories])
     return categories
@@ -345,6 +369,12 @@ class Menu(tk.Menu):
         menu.add_checkbutton(label="Labels", onvalue=True, offvalue=False)
         menu.add_checkbutton(label="Masks", onvalue=True, offvalue=False)
         self.add_cascade(label="View", menu=menu)
+
+        menu.colormenu = tk.Menu(menu, tearoff=0)
+        menu.colormenu.add_radiobutton(label="Categories", value=False)
+        menu.colormenu.add_radiobutton(label="Objects", value=True)
+
+        menu.add_cascade(label="Coloring", menu=menu.colormenu)
         return menu
 
 
@@ -417,18 +447,23 @@ class Controller:
         self.labels_on_global.set(True)
         self.masks_on_global = tk.BooleanVar()  # Toggles masks globally
         self.masks_on_global.set(True)
+        self.coloring_on_global = tk.BooleanVar()  # Toggles objects/categories coloring
+        self.coloring_on_global.set(False)  # False for categories (defaults), True for objects
         # Menu Configuration
         self.menu.file.entryconfigure("Save", command=self.save_image)
         self.menu.file.entryconfigure("Exit", command=self.exit)
         self.menu.view.entryconfigure("BBoxes", variable=self.bboxes_on_global, command=self.menu_view_bboxes)
         self.menu.view.entryconfigure("Labels", variable=self.labels_on_global, command=self.menu_view_labels)
         self.menu.view.entryconfigure("Masks", variable=self.masks_on_global, command=self.menu_view_masks)
+        self.menu.view.colormenu.entryconfigure("Categories", variable=self.coloring_on_global, command=self.menu_view_coloring)
+        self.menu.view.colormenu.entryconfigure("Objects", variable=self.coloring_on_global, command=self.menu_view_coloring)
         self.root.configure(menu=self.menu)
 
         # Init local setup (for the current (active) image)
         self.bboxes_on_local = self.bboxes_on_global.get()
         self.labels_on_local = self.labels_on_global.get()
         self.masks_on_local = self.masks_on_global.get()
+        self.coloring_on_local = self.coloring_on_global.get()
 
         # Objects Panel stuff
         self.selected_cats = None
@@ -462,6 +497,7 @@ class Controller:
         self.bboxes_on_local = self.bboxes_on_global.get()
         self.labels_on_local = self.labels_on_global.get()
         self.masks_on_local = self.masks_on_global.get()
+        self.coloring_on_local = self.coloring_on_global.get()
 
         # Update sliders
         self.update_sliders_state()
@@ -497,9 +533,10 @@ class Controller:
         bboxes_on = self.bboxes_on_local if local else self.bboxes_on_global.get()
         labels_on = self.labels_on_local if local else self.labels_on_global.get()
         masks_on = self.masks_on_local if local else self.masks_on_global.get()
+        coloring = self.coloring_on_local if local else self.coloring_on_global.get()
 
         # Prepare image
-        full_path, objects, names_colors, img_obj_categories, img_categories = self.data.prepare_image()
+        full_path, objects, names_colors, img_obj_categories, img_categories = self.data.prepare_image(coloring)
         self.current_img_obj_categories = img_obj_categories
         self.current_img_categories = img_categories
 
@@ -596,6 +633,10 @@ class Controller:
     def menu_view_masks(self):
         self.masks_on_local = self.masks_on_global.get()
         self.masks_slider_status_update()
+        self.update_img()
+
+    def menu_view_coloring(self):
+        self.coloring_on_local = self.coloring_on_global.get()
         self.update_img()
 
     def toggle_bboxes(self, event=None):
