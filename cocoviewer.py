@@ -205,18 +205,22 @@ def draw_masks(draw, objects, obj_categories, ignore, alpha):
             else:
                 continue
 
-def rle_to_mask(rle,height,width):
-  rows, cols = height, width
-  rlePairs = np.array(rle).reshape(-1,2)
-  img = np.zeros(rows*cols, dtype=np.uint8)
-  index_offset = 0
-  for index, length in rlePairs:
-    index_offset += index
-    img[index_offset:index_offset+length] = 255
-    index_offset+=length
-  img = img.reshape(cols,rows)
-  img = img.T
-  return img
+
+def rle_to_mask(rle, height, width):
+    rows, cols = height, width
+    rle_pairs = np.array(rle).reshape(-1, 2)
+    img = np.zeros(rows * cols, dtype=np.uint8)
+    index_offset = 0
+
+    for index, length in rle_pairs:
+        index_offset += index
+        img[index_offset:index_offset + length] = 255
+        index_offset += length
+
+    img = img.reshape(cols, rows)
+    img = img.T
+    return img
+
 
 class ImageList:
     """Handles iterating through the images.
