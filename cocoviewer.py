@@ -14,6 +14,7 @@ import tkinter.ttk as ttk
 from tkinter import filedialog, messagebox
 from turtle import __forwardmethods
 
+import numpy as np
 from PIL import Image, ImageDraw, ImageTk, ImageFont
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
@@ -195,11 +196,30 @@ def draw_masks(draw, objects, obj_categories, ignore, alpha):
                 for m_ in m:
                     if m_:
                         draw.polygon(m_, outline=fill, fill=fill)
-            # TODO: Fix problem with RLE
-            # elif isinstance(m, dict):
-            #     draw.polygon(m['counts'][1:-2], outline=c[-1], fill=fill)
+            # RLE mask for collection of objects (iscrowd=1)
+            elif isinstance(m, dict) and objects[i]["iscrowd"]:
+                mask = rle_to_mask(m['counts'][:-1], m["size"][0], m["size"][1])
+                mask = Image.fromarray(mask)
+                draw.bitmap((0, 0), mask, fill=fill)
+
             else:
                 continue
+
+
+def rle_to_mask(rle, height, width):
+    rows, cols = height, width
+    rle_pairs = np.array(rle).reshape(-1, 2)
+    img = np.zeros(rows * cols, dtype=np.uint8)
+    index_offset = 0
+
+    for index, length in rle_pairs:
+        index_offset += index
+        img[index_offset:index_offset + length] = 255
+        index_offset += length
+
+    img = img.reshape(cols, rows)
+    img = img.T
+    return img
 
 
 class ImageList:
