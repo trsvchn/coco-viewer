@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """COCO Dataset Viewer.
+
 View images with bboxes from the COCO dataset.
 """
 import argparse
