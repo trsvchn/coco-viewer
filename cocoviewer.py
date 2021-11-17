@@ -196,7 +196,7 @@ def draw_masks(draw, objects, obj_categories, ignore, alpha):
                 for m_ in m:
                     if m_:
                         draw.polygon(m_, outline=fill, fill=fill)
-            # TODO: Fix problem with RLE
+            # RLE mask for collection of objects (iscrowd=1)
             elif isinstance(m, dict):
                 mask = rle_to_mask(m['counts'][:-1], m["size"][0], m["size"][1])
                 mask = Image.fromarray(mask)
