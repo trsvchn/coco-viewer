@@ -4,29 +4,36 @@
 View images with bboxes from the COCO dataset.
 """
 import argparse
-import os
-import random
 import colorsys
 import json
 import logging
+import os
+import random
 import tkinter as tk
 import tkinter.ttk as ttk
 from tkinter import filedialog, messagebox
 from turtle import __forwardmethods
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageTk, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageTk
 
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 parser = argparse.ArgumentParser(description="View images with bboxes from the COCO dataset")
-parser.add_argument("-i", "--images", default='', type=str, metavar="PATH", help="path to images folder")
-parser.add_argument("-a", "--annotations", default='', type=str, metavar="PATH", help="path to annotations json file")
+parser.add_argument("-i", "--images", default="", type=str, metavar="PATH", help="path to images folder")
+parser.add_argument(
+    "-a",
+    "--annotations",
+    default="",
+    type=str,
+    metavar="PATH",
+    help="path to annotations json file",
+)
 
 
 class Data:
-    """Handles data related stuff.
-    """
+    """Handles data related stuff."""
+
     def __init__(self, image_dir, annotations_file):
         self.image_dir = image_dir
         instances, images, categories = parse_coco(annotations_file)
@@ -38,8 +45,7 @@ class Data:
         self.current_image = self.images.next()  # Set the first image as current
 
     def prepare_image(self, object_based_coloring: bool = False):
-        """Prepares image path, objects, colors.
-        """
+        """Prepares image path, objects, colors."""
         # TODO: predicted bboxes drawing (from models)
         img_id, img_name = self.current_image
         full_path = os.path.join(self.image_dir, img_name)
@@ -72,19 +78,16 @@ class Data:
         return full_path, objects, names_colors, img_obj_categories, img_categories
 
     def next_image(self):
-        """Loads the next image in a list.
-        """
+        """Loads the next image in a list."""
         self.current_image = self.images.next()
 
     def previous_image(self):
-        """Loads the previous image in a list.
-        """
+        """Loads the previous image in a list."""
         self.current_image = self.images.prev()
 
 
 def parse_coco(annotations_file: str) -> tuple:
-    """Parses COCO json annotation file.
-    """
+    """Parses COCO json annotation file."""
     instances = load_annotations(annotations_file)
     images = get_images(instances)
     categories = get_categories(instances)
@@ -92,8 +95,7 @@ def parse_coco(annotations_file: str) -> tuple:
 
 
 def load_annotations(fname: str) -> dict:
-    """Loads annotations file.
-    """
+    """Loads annotations file."""
     logging.info(f"Parsing {fname}...")
 
     with open(fname) as f:
@@ -102,14 +104,12 @@ def load_annotations(fname: str) -> dict:
 
 
 def get_images(instances: dict) -> list:
-    """Extracts all image ids and file names from annotations file.
-    """
+    """Extracts all image ids and file names from annotations file."""
     return [(image["id"], image["file_name"]) for image in instances["images"]]
 
 
 def open_image(full_img_path: str):
-    """Opens image, creates draw context.
-    """
+    """Opens image, creates draw context."""
     # Open image
     img_open = Image.open(full_img_path).convert("RGBA")
     # Create layer for bboxes and masks
@@ -119,10 +119,9 @@ def open_image(full_img_path: str):
 
 
 def prepare_colors(n_objects: int, shuffle: bool = True) -> list:
-    """Get some colors.
-    """
+    """Get some colors."""
     # Get some colors
-    hsv_tuples = [(x / n_objects, 1., 1.) for x in range(n_objects)]
+    hsv_tuples = [(x / n_objects, 1.0, 1.0) for x in range(n_objects)]
     colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
     colors = list(map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)), colors))
 
@@ -136,23 +135,31 @@ def prepare_colors(n_objects: int, shuffle: bool = True) -> list:
 
 
 def get_categories(instances: dict) -> dict:
-    """Extracts categories from annotations file and prepares color for each one.
-    """
+    """Extracts categories from annotations file and prepares color for each one."""
     # Parse categories
     colors = prepare_colors(n_objects=80, shuffle=True)
-    categories = list(zip([[category["id"], category["name"]] for category in instances["categories"]], colors))
+    categories = list(
+        zip(
+            [[category["id"], category["name"]] for category in instances["categories"]],
+            colors,
+        )
+    )
     categories = dict([[cat[0][0], [cat[0][1], cat[1]]] for cat in categories])
     return categories
 
 
 def draw_bboxes(draw, objects, labels, obj_categories, ignore, width, label_size):
-    """Puts rectangles on the image.
-    """
+    """Puts rectangles on the image."""
     # Extracting bbox coordinates
-    bboxes = [[obj["bbox"][0],
-               obj["bbox"][1],
-               obj["bbox"][0] + obj["bbox"][2],
-               obj["bbox"][1] + obj["bbox"][3]] for obj in objects]
+    bboxes = [
+        [
+            obj["bbox"][0],
+            obj["bbox"][1],
+            obj["bbox"][0] + obj["bbox"][2],
+            obj["bbox"][1] + obj["bbox"][3],
+        ]
+        for obj in objects
+    ]
     # Draw bboxes
     for i, (c, b) in enumerate(zip(obj_categories, bboxes)):
         if i not in ignore:
@@ -194,8 +201,7 @@ def draw_bboxes(draw, objects, labels, obj_categories, ignore, width, label_size
 
 
 def draw_masks(draw, objects, obj_categories, ignore, alpha):
-    """Draws a masks over image.
-    """
+    """Draws a masks over image."""
     masks = [obj["segmentation"] for obj in objects]
     # Draw masks
     for i, (c, m) in enumerate(zip(obj_categories, masks)):
@@ -209,7 +215,7 @@ def draw_masks(draw, objects, obj_categories, ignore, alpha):
                         draw.polygon(m_, outline=fill, fill=fill)
             # RLE mask for collection of objects (iscrowd=1)
             elif isinstance(m, dict) and objects[i]["iscrowd"]:
-                mask = rle_to_mask(m['counts'][:-1], m["size"][0], m["size"][1])
+                mask = rle_to_mask(m["counts"][:-1], m["size"][0], m["size"][1])
                 mask = Image.fromarray(mask)
                 draw.bitmap((0, 0), mask, fill=fill)
 
@@ -225,7 +231,7 @@ def rle_to_mask(rle, height, width):
 
     for index, length in rle_pairs:
         index_offset += index
-        img[index_offset:index_offset + length] = 255
+        img[index_offset : index_offset + length] = 255
         index_offset += length
 
     img = img.reshape(cols, rows)
@@ -234,16 +240,15 @@ def rle_to_mask(rle, height, width):
 
 
 class ImageList:
-    """Handles iterating through the images.
-    """
+    """Handles iterating through the images."""
+
     def __init__(self, images: list):
         self.image_list = images or []
         self.n = -1
         self.max = len(self.image_list)
 
     def next(self):
-        """Sets the next image as current.
-        """
+        """Sets the next image as current."""
         self.n += 1
 
         if self.n < self.max:
@@ -254,8 +259,7 @@ class ImageList:
         return current_image
 
     def prev(self):
-        """Sets the previous image as current.
-        """
+        """Sets the previous image as current."""
         if self.n == 0:
             self.n = self.max - 1
             current_image = self.image_list[self.n]
@@ -266,8 +270,8 @@ class ImageList:
 
 
 class ImagePanel(ttk.Frame):
-    """ttk port of original turtle.ScrolledCanvas code.
-    """
+    """ttk port of original turtle.ScrolledCanvas code."""
+
     def __init__(self, parent, width=768, height=480, canvwidth=600, canvheight=500):
         super().__init__(parent, width=width, height=height)
         self._rootwindow = self.winfo_toplevel()
@@ -276,23 +280,56 @@ class ImagePanel(ttk.Frame):
         self.bg = "gray15"
         self.pack(fill=tk.BOTH, expand=True)
 
-        self._canvas = tk.Canvas(parent, width=width, height=height, bg=self.bg, relief="sunken", borderwidth=2)
+        self._canvas = tk.Canvas(
+            parent,
+            width=width,
+            height=height,
+            bg=self.bg,
+            relief="sunken",
+            borderwidth=2,
+        )
         self.hscroll = ttk.Scrollbar(parent, command=self._canvas.xview, orient=tk.HORIZONTAL)
         self.vscroll = ttk.Scrollbar(parent, command=self._canvas.yview)
         self._canvas.configure(xscrollcommand=self.hscroll.set, yscrollcommand=self.vscroll.set)
 
         self.rowconfigure(0, weight=1, minsize=0)
         self.columnconfigure(0, weight=1, minsize=0)
-        self._canvas.grid(padx=1, in_=self, pady=1, row=0, column=0, rowspan=1, columnspan=1, sticky=tk.NSEW)
-        self.vscroll.grid(padx=1, in_=self, pady=1, row=0, column=1, rowspan=1, columnspan=1, sticky=tk.NSEW)
-        self.hscroll.grid(padx=1, in_=self, pady=1, row=1, column=0, rowspan=1, columnspan=1, sticky=tk.NSEW)
+        self._canvas.grid(
+            padx=1,
+            in_=self,
+            pady=1,
+            row=0,
+            column=0,
+            rowspan=1,
+            columnspan=1,
+            sticky=tk.NSEW,
+        )
+        self.vscroll.grid(
+            padx=1,
+            in_=self,
+            pady=1,
+            row=0,
+            column=1,
+            rowspan=1,
+            columnspan=1,
+            sticky=tk.NSEW,
+        )
+        self.hscroll.grid(
+            padx=1,
+            in_=self,
+            pady=1,
+            row=1,
+            column=0,
+            rowspan=1,
+            columnspan=1,
+            sticky=tk.NSEW,
+        )
 
         self.reset()
         self._rootwindow.bind("<Configure>", self.on_resize)
 
     def reset(self, canvwidth=None, canvheight=None, bg=None):
-        """Adjusts canvas and scrollbars according to given canvas size.
-        """
+        """Adjusts canvas and scrollbars according to given canvas size."""
         if canvwidth:
             self.canvwidth = canvwidth
         if canvheight:
@@ -313,8 +350,7 @@ class ImagePanel(ttk.Frame):
         self.adjust_scrolls()
 
     def adjust_scrolls(self):
-        """Adjusts scrollbars according to window- and canvas-size.
-        """
+        """Adjusts scrollbars according to window- and canvas-size."""
         cwidth = self._canvas.winfo_width()
         cheight = self._canvas.winfo_height()
 
@@ -322,11 +358,29 @@ class ImagePanel(ttk.Frame):
         self._canvas.yview_moveto(0.5 * (self.canvheight - cheight) / self.canvheight)
 
         if cwidth < self.canvwidth:
-            self.hscroll.grid(padx=1, in_=self, pady=1, row=1, column=0, rowspan=1, columnspan=1, sticky=tk.NSEW)
+            self.hscroll.grid(
+                padx=1,
+                in_=self,
+                pady=1,
+                row=1,
+                column=0,
+                rowspan=1,
+                columnspan=1,
+                sticky=tk.NSEW,
+            )
         else:
             self.hscroll.grid_forget()
         if cheight < self.canvheight:
-            self.vscroll.grid(padx=1, in_=self, pady=1, row=0, column=1, rowspan=1, columnspan=1, sticky=tk.NSEW)
+            self.vscroll.grid(
+                padx=1,
+                in_=self,
+                pady=1,
+                row=0,
+                column=1,
+                rowspan=1,
+                columnspan=1,
+                sticky=tk.NSEW,
+            )
         else:
             self.vscroll.grid_forget()
 
@@ -356,8 +410,8 @@ __forwardmethods(ImagePanel, tk.Canvas, "_canvas")
 
 
 class StatusBar(ttk.Frame):
-    """Shows status line on the bottom.
-    """
+    """Shows status line on the bottom."""
+
     def __init__(self, parent):
         super().__init__(parent)
         # self.configure(bd="gray75")
@@ -383,8 +437,7 @@ class Menu(tk.Menu):
         self.view = self.view_menu()
 
     def file_menu(self):
-        """File Menu.
-        """
+        """File Menu."""
         menu = tk.Menu(self, tearoff=False)
         menu.add_command(label="Save", accelerator="Ctrl+S")
         menu.add_separator()
@@ -393,8 +446,7 @@ class Menu(tk.Menu):
         return menu
 
     def view_menu(self):
-        """View Menu.
-        """
+        """View Menu."""
         menu = tk.Menu(self, tearoff=False)
         menu.add_checkbutton(label="BBoxes", onvalue=True, offvalue=False)
         menu.add_checkbutton(label="Labels", onvalue=True, offvalue=False)
@@ -410,15 +462,20 @@ class Menu(tk.Menu):
 
 
 class ObjectsPanel(ttk.PanedWindow):
-    """Panels with listed objects and categories for the image.
-    """
+    """Panels with listed objects and categories for the image."""
+
     def __init__(self, parent):
         super().__init__(parent)
         self.pack(side=tk.RIGHT, fill=tk.Y)
 
         # Categories subpanel
         self.category_subpanel = ttk.Frame()
-        ttk.Label(self.category_subpanel, text="categories", borderwidth=2, background="gray50").pack(side=tk.TOP, fill=tk.X)
+        ttk.Label(
+            self.category_subpanel,
+            text="categories",
+            borderwidth=2,
+            background="gray50",
+        ).pack(side=tk.TOP, fill=tk.X)
         self.category_box = tk.Listbox(self.category_subpanel, selectmode=tk.EXTENDED, exportselection=0)
         self.category_box.pack(side=tk.TOP, fill=tk.Y, expand=True)
         self.add(self.category_subpanel)
@@ -486,8 +543,14 @@ class Controller:
         self.menu.view.entryconfigure("BBoxes", variable=self.bboxes_on_global, command=self.menu_view_bboxes)
         self.menu.view.entryconfigure("Labels", variable=self.labels_on_global, command=self.menu_view_labels)
         self.menu.view.entryconfigure("Masks", variable=self.masks_on_global, command=self.menu_view_masks)
-        self.menu.view.colormenu.entryconfigure("Categories", variable=self.coloring_on_global, command=self.menu_view_coloring)
-        self.menu.view.colormenu.entryconfigure("Objects", variable=self.coloring_on_global, command=self.menu_view_coloring)
+        self.menu.view.colormenu.entryconfigure(
+            "Categories",
+            variable=self.coloring_on_global,
+            command=self.menu_view_coloring,
+        )
+        self.menu.view.colormenu.entryconfigure(
+            "Objects", variable=self.coloring_on_global, command=self.menu_view_coloring
+        )
         self.root.configure(menu=self.menu)
 
         # Init local setup (for the current (active) image)
@@ -534,17 +597,17 @@ class Controller:
         self.update_sliders_state()
 
     def compose_image(
-            self,
-            full_path,
-            objects,
-            names_colors,
-            bboxes_on: bool = True,
-            labels_on: bool = True,
-            masks_on: bool = True,
-            ignore: list = None,
-            width: int = 1,
-            alpha: int = 128,
-            label_size: int = 15,
+        self,
+        full_path,
+        objects,
+        names_colors,
+        bboxes_on: bool = True,
+        labels_on: bool = True,
+        masks_on: bool = True,
+        ignore: list = None,
+        width: int = 1,
+        alpha: int = 128,
+        label_size: int = 15,
     ):
         ignore = ignore or []  # list of objects to ignore
         img_open, draw_layer, draw = open_image(full_path)
@@ -559,15 +622,20 @@ class Controller:
         self.current_composed_image = Image.alpha_composite(img_open, draw_layer)
 
     def update_img(self, local=True, width=None, alpha=None, label_size=None):
-        """Triggers image composition and sets composed image as current.
-        """
+        """Triggers image composition and sets composed image as current."""
         bboxes_on = self.bboxes_on_local if local else self.bboxes_on_global.get()
         labels_on = self.labels_on_local if local else self.labels_on_global.get()
         masks_on = self.masks_on_local if local else self.masks_on_global.get()
         coloring = self.coloring_on_local if local else self.coloring_on_global.get()
 
         # Prepare image
-        full_path, objects, names_colors, img_obj_categories, img_categories = self.data.prepare_image(coloring)
+        (
+            full_path,
+            objects,
+            names_colors,
+            img_obj_categories,
+            img_categories,
+        ) = self.data.prepare_image(coloring)
         self.current_img_obj_categories = img_obj_categories
         self.current_img_categories = img_categories
 
@@ -634,8 +702,7 @@ class Controller:
         self.update_img(local=False)
 
     def save_image(self, event=None):
-        """Saves composed image as png file.
-        """
+        """Saves composed image as png file."""
         # Initial (original) file name
         initialfile = self.data.current_image[-1].split(".")[0]
         # TODO: Add more formats, at least jpg (RGBA -> RGB)?
@@ -773,8 +840,7 @@ class Controller:
         self.sliders.mask_slider.configure(state=tk.NORMAL if self.masks_on_local else tk.DISABLED)
 
     def bind_events(self):
-        """Binds events.
-        """
+        """Binds events."""
         # Navigation
         self.root.bind("<Left>", self.prev_img)
         self.root.bind("<k>", self.prev_img)
