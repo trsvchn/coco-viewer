@@ -200,6 +200,44 @@ def draw_bboxes(draw, objects, labels, obj_categories, ignore, width, label_size
                 draw.text((tx0, ty0), text, (255, 255, 255), font=font)
 
 
+def draw_rotated_bboxes(draw, objects, labels, obj_categories, ignore, width, label_size):
+    for i, (c, obj) in enumerate(zip(obj_categories, objects)):
+        print('obj', obj)
+        if 'attributes' in obj.keys():
+            if obj['attributes']['rotation'] != 0:
+
+                x = int(obj['bbox'][0])
+                y = int(obj['bbox'][1])
+                box_width = int(obj['bbox'][2])
+                box_height = int(obj['bbox'][3])
+                rotation = obj['attributes']['rotation']
+
+
+                points = [(int(x), int(y)),
+                          (int(x + box_width), int(y)),
+                          (int(x + box_width), int(y + box_height)),
+                          (int(x), int(y + box_height))]
+
+                center_point = (int(x + box_width / 2), int(y + box_height / 2))
+
+                angle_rad = rotation * (3.14159 / 180)
+                center_x, center_y = center_point
+                rotated_points = []
+                import math
+                for point in points:
+                    translated_x = point[0] - center_x
+                    translated_y = point[1] - center_y
+                    rotated_x = translated_x * math.cos(angle_rad) - translated_y * math.sin(angle_rad)
+                    rotated_y = translated_x * math.sin(angle_rad) + translated_y * math.cos(angle_rad)
+                    final_x = rotated_x + center_x
+                    final_y = rotated_y + center_y
+                    rotated_points.append((final_x, final_y))
+
+                draw.polygon(rotated_points, outline="red", width=width)
+
+                break
+
+
 def draw_masks(draw, objects, obj_categories, ignore, alpha):
     """Draws a masks over image."""
     masks = [obj["segmentation"] for obj in objects]
@@ -616,7 +654,8 @@ class Controller:
             draw_masks(draw, objects, names_colors, ignore, alpha)
         # Draw bounding boxes
         if bboxes_on:
-            draw_bboxes(draw, objects, labels_on, names_colors, ignore, width, label_size)
+            # draw_bboxes(draw, objects, labels_on, names_colors, ignore, width, label_size)
+            draw_rotated_bboxes(draw, objects, labels_on, names_colors, ignore, width, label_size)
         del draw
         # Resulting image
         self.current_composed_image = Image.alpha_composite(img_open, draw_layer)
