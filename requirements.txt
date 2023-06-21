@@ -1,0 +1,10 @@
+cffi~=1.15.1
+future~=0.18.3
+Pillow~=9.0.1
+pip~=22.0.4
+wheel~=0.37.1
+cryptography~=3.4.8
+numpy~=1.21.6
+setuptools~=59.6.0
+certifi~=2020.6.20
+pycparser~=2.21
