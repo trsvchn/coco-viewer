@@ -207,37 +207,38 @@ def draw_bboxes(draw, objects, labels, obj_categories, ignore, width, label_size
 
 def draw_rotated_bboxes(draw, objects, labels, obj_categories, ignore, width, label_size):
     for i, (c, obj) in enumerate(zip(obj_categories, objects)):
-        x = int(obj['bbox'][0])
-        y = int(obj['bbox'][1])
-        box_width = int(obj['bbox'][2])
-        box_height = int(obj['bbox'][3])
-        box = [x, y, x+box_width, y+box_height]
+        if i not in ignore:
+            x = int(obj['bbox'][0])
+            y = int(obj['bbox'][1])
+            box_width = int(obj['bbox'][2])
+            box_height = int(obj['bbox'][3])
+            box = [x, y, x+box_width, y+box_height]
 
-        rotation = obj['attributes']['rotation']
+            rotation = obj['attributes']['rotation']
 
-        points = [(int(x), int(y)),
-                  (int(x + box_width), int(y)),
-                  (int(x + box_width), int(y + box_height)),
-                  (int(x), int(y + box_height))]
+            points = [(int(x), int(y)),
+                      (int(x + box_width), int(y)),
+                      (int(x + box_width), int(y + box_height)),
+                      (int(x), int(y + box_height))]
 
-        center_point = (int(x + box_width / 2), int(y + box_height / 2))
+            center_point = (int(x + box_width / 2), int(y + box_height / 2))
 
-        angle_rad = rotation * (3.14159 / 180)
-        rotated_points = []
+            angle_rad = rotation * (3.14159 / 180)
+            rotated_points = []
 
-        for point in points:
-            translated_x = point[0] - center_point[0]
-            translated_y = point[1] - center_point[1]
-            rotated_x = translated_x * math.cos(angle_rad) - translated_y * math.sin(angle_rad)
-            rotated_y = translated_x * math.sin(angle_rad) + translated_y * math.cos(angle_rad)
-            final_x = rotated_x + center_point[0]
-            final_y = rotated_y + center_point[1]
-            rotated_points.append((final_x, final_y))
+            for point in points:
+                translated_x = point[0] - center_point[0]
+                translated_y = point[1] - center_point[1]
+                rotated_x = translated_x * math.cos(angle_rad) - translated_y * math.sin(angle_rad)
+                rotated_y = translated_x * math.sin(angle_rad) + translated_y * math.cos(angle_rad)
+                final_x = rotated_x + center_point[0]
+                final_y = rotated_y + center_point[1]
+                rotated_points.append((final_x, final_y))
 
-        draw.polygon(rotated_points, outline=c[-1], width=width)
+            draw.polygon(rotated_points, outline=c[-1], width=width)
 
-        if labels:
-            show_label(label_size, c, box, draw)
+            if labels:
+                show_label(label_size, c, box, draw)
 
 
 def draw_masks(draw, objects, obj_categories, ignore, alpha):
