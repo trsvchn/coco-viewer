@@ -3,6 +3,7 @@
 
 View images with bboxes from the COCO dataset.
 """
+import math
 import argparse
 import colorsys
 import json
@@ -148,6 +149,41 @@ def get_categories(instances: dict) -> dict:
     return categories
 
 
+def show_label(label_size, c, b, draw):
+    text = c[0]
+
+    try:
+        try:
+            # Should work for Linux
+            font = ImageFont.truetype("DejaVuSans.ttf", size=label_size)
+        except OSError:
+            # Should work for Windows
+            font = ImageFont.truetype("Arial.ttf", size=label_size)
+    except OSError:
+        # Load default, note no resize option
+        # TODO: Implement notification message as popup window
+        font = ImageFont.load_default()
+
+    tw, th = draw.textsize(text, font)
+    tx0 = b[0]
+    ty0 = b[1] - th
+
+    # TODO: Looks weird! We need image dims to make it right
+    tx0 = max(b[0], max(b[0], tx0)) if tx0 < 0 else tx0
+    ty0 = max(b[1], max(0, ty0)) if ty0 < 0 else ty0
+
+    tx1 = tx0 + tw
+    ty1 = ty0 + th
+
+    # TODO: The same here
+    if tx1 > b[2]:
+        tx0 = max(0, tx0 - (tx1 - b[2]))
+        tx1 = tw if tx0 == 0 else b[2]
+
+    draw.rectangle((tx0, ty0, tx1, ty1), fill=c[-1])
+    draw.text((tx0, ty0), text, (255, 255, 255), font=font)
+
+
 def draw_bboxes(draw, objects, labels, obj_categories, ignore, width, label_size):
     """Puts rectangles on the image."""
     # Extracting bbox coordinates
@@ -166,38 +202,8 @@ def draw_bboxes(draw, objects, labels, obj_categories, ignore, width, label_size
             draw.rectangle(b, outline=c[-1], width=width)
 
             if labels:
-                text = c[0]
+                show_label(label_size, c, b, draw)
 
-                try:
-                    try:
-                        # Should work for Linux
-                        font = ImageFont.truetype("DejaVuSans.ttf", size=label_size)
-                    except OSError:
-                        # Should work for Windows
-                        font = ImageFont.truetype("Arial.ttf", size=label_size)
-                except OSError:
-                    # Load default, note no resize option
-                    # TODO: Implement notification message as popup window
-                    font = ImageFont.load_default()
-
-                tw, th = draw.textsize(text, font)
-                tx0 = b[0]
-                ty0 = b[1] - th
-
-                # TODO: Looks weird! We need image dims to make it right
-                tx0 = max(b[0], max(b[0], tx0)) if tx0 < 0 else tx0
-                ty0 = max(b[1], max(0, ty0)) if ty0 < 0 else ty0
-
-                tx1 = tx0 + tw
-                ty1 = ty0 + th
-
-                # TODO: The same here
-                if tx1 > b[2]:
-                    tx0 = max(0, tx0 - (tx1 - b[2]))
-                    tx1 = tw if tx0 == 0 else b[2]
-
-                draw.rectangle((tx0, ty0, tx1, ty1), fill=c[-1])
-                draw.text((tx0, ty0), text, (255, 255, 255), font=font)
 
 
 def draw_rotated_bboxes(draw, objects, labels, obj_categories, ignore, width, label_size):
@@ -210,6 +216,8 @@ def draw_rotated_bboxes(draw, objects, labels, obj_categories, ignore, width, la
                 y = int(obj['bbox'][1])
                 box_width = int(obj['bbox'][2])
                 box_height = int(obj['bbox'][3])
+                box = [x, y, x+box_width, y+box_height]
+
                 rotation = obj['attributes']['rotation']
 
 
@@ -223,7 +231,7 @@ def draw_rotated_bboxes(draw, objects, labels, obj_categories, ignore, width, la
                 angle_rad = rotation * (3.14159 / 180)
                 center_x, center_y = center_point
                 rotated_points = []
-                import math
+
                 for point in points:
                     translated_x = point[0] - center_x
                     translated_y = point[1] - center_y
@@ -233,9 +241,11 @@ def draw_rotated_bboxes(draw, objects, labels, obj_categories, ignore, width, la
                     final_y = rotated_y + center_y
                     rotated_points.append((final_x, final_y))
 
-                draw.polygon(rotated_points, outline="red", width=width)
+                draw.polygon(rotated_points, outline=c[-1], width=width)
 
-                break
+                if labels:
+                    show_label(label_size, c, box, draw)
+
 
 
 def draw_masks(draw, objects, obj_categories, ignore, alpha):
