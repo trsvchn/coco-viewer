@@ -84,6 +84,9 @@ class Data:
     def previous_image(self):
         """Loads the previous image in a list."""
         self.current_image = self.images.prev()
+    
+    def select_image(self, ind):
+        self.current_image = self.images.set(ind)
 
 
 def parse_coco(annotations_file: str) -> tuple:
@@ -180,7 +183,9 @@ def draw_bboxes(draw, objects, labels, obj_categories, ignore, width, label_size
                     # TODO: Implement notification message as popup window
                     font = ImageFont.load_default()
 
-                tw, th = draw.textsize(text, font)
+                text_size = draw.textbbox((0, 0), text, font=font)
+                tw = text_size[2] - text_size[0]
+                th = text_size[3] - text_size[1]
                 tx0 = b[0]
                 ty0 = b[1] - th
 
@@ -212,7 +217,10 @@ def draw_masks(draw, objects, obj_categories, ignore, alpha):
             if isinstance(m, list):
                 for m_ in m:
                     if m_:
-                        draw.polygon(m_, outline=fill, fill=fill)
+                        try:
+                            draw.polygon(m_, outline=fill, fill=fill)
+                        except:
+                            print('WARNING draw_masks: invalid polygon', m_)
             # RLE mask for collection of objects (iscrowd=1)
             elif isinstance(m, dict) and objects[i]["iscrowd"]:
                 mask = rle_to_mask(m["counts"][:-1], m["size"][0], m["size"][1])
@@ -266,6 +274,12 @@ class ImageList:
         else:
             self.n -= 1
             current_image = self.image_list[self.n]
+        return current_image
+    
+    def set(self,ind):
+        assert ind>=0 and ind < self.max
+        self.n = ind
+        current_image = self.image_list[self.n]
         return current_image
 
 
@@ -487,6 +501,20 @@ class ObjectsPanel(ttk.PanedWindow):
         self.object_box.pack(side=tk.TOP, fill=tk.Y, expand=True)
         self.add(self.object_subpanel)
 
+class ImagelistPanel(ttk.PanedWindow):
+    def __init__(self, parent):
+        super().__init__(parent)
+        # Image list subpanel
+        self.pack(side=tk.LEFT, fill=tk.Y)
+        self.imglist_subpanel = ttk.Frame()
+        ttk.Label(self.imglist_subpanel, text="image list", borderwidth=2, background="gray50").pack(side=tk.TOP, fill=tk.X)
+        # image list controller
+        scrollbar = tk.Scrollbar(self.imglist_subpanel)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.imglist_box = tk.Listbox(self.imglist_subpanel, selectmode=tk.EXTENDED, exportselection=0,yscrollcommand=scrollbar.set)
+        scrollbar.config(command=self.imglist_box.yview)
+        self.imglist_box.pack(side=tk.TOP, fill=tk.Y, expand=True)
+        self.add(self.imglist_subpanel)
 
 class SlidersBar(ttk.Frame):
     def __init__(self, parent):
@@ -504,16 +532,18 @@ class SlidersBar(ttk.Frame):
         # Mask transparency controller
         self.mask_slider = tk.Scale(self, label="mask", from_=0, to=255, tickinterval=50, orient=tk.HORIZONTAL)
         self.mask_slider.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
 
 
 class Controller:
-    def __init__(self, data, root, image_panel, statusbar, menu, objects_panel, sliders):
+    def __init__(self, data, root, image_panel, statusbar, menu, objects_panel, sliders, imglist_panel):
         self.data = data  # data layer
         self.root = root  # root window
         self.image_panel = image_panel  # image panel
         self.statusbar = statusbar  # statusbar on the bottom
         self.menu = menu  # main menu on the top
         self.objects_panel = objects_panel
+        self.imglist_panel = imglist_panel
         self.sliders = sliders
 
         # StatusBar Vars
@@ -564,9 +594,10 @@ class Controller:
         self.selected_objs = None
         self.category_box_content = tk.StringVar()
         self.object_box_content = tk.StringVar()
+        self.imglist_box_content = tk.StringVar()
         self.objects_panel.category_box.configure(listvariable=self.category_box_content)
         self.objects_panel.object_box.configure(listvariable=self.object_box_content)
-
+        self.imglist_panel.imglist_box.configure(listvariable=self.imglist_box_content)
         # Sliders Setup
         self.bbox_thickness = tk.IntVar()
         self.bbox_thickness.set(3)
@@ -586,6 +617,8 @@ class Controller:
         self.current_img_obj_categories = None
         self.current_img_categories = None
         self.update_img()
+
+        self.update_imglist_box()
 
     def set_locals(self):
         self.bboxes_on_local = self.bboxes_on_global.get()
@@ -825,6 +858,21 @@ class Controller:
         self.selected_cats = selected_cats
         self.update_img()
 
+    def update_imglist_box(self):
+        imglist = [f'{i:04d} {name}' for i,name in self.data.images.image_list]
+        self.imglist_box_content.set(imglist)
+        max_len = max(len(item) for item in imglist)
+        self.imglist_panel.imglist_box.config(width = max_len)
+        self.imglist_panel.imglist_box.select_set(0,tk.END)
+
+    def select_img(self, event):
+        ind = self.imglist_panel.imglist_box.curselection()[0]
+        self.data.select_image(ind)
+        self.set_locals()
+        self.selected_cats = None
+        self.selected_objs = None
+        self.update_img(local=False)
+
     def update_sliders_state(self):
         self.bbox_slider_status_update()
         self.label_slider_status_update()
@@ -864,6 +912,7 @@ class Controller:
         # Objects Panel
         self.objects_panel.category_box.bind("<<ListboxSelect>>", self.select_category)
         self.objects_panel.object_box.bind("<<ListboxSelect>>", self.select_object)
+        self.imglist_panel.imglist_box.bind("<<ListboxSelect>>", self.select_img)
         self.image_panel.bind("<Button-1>", lambda e: self.image_panel.focus_set())
 
 
@@ -888,9 +937,10 @@ def main():
     statusbar = StatusBar(root)
     sliders = SlidersBar(root)
     objects_panel = ObjectsPanel(root)
+    imglist_panel = ImagelistPanel(root)
     menu = Menu(root)
     image_panel = ImagePanel(root)
-    Controller(data, root, image_panel, statusbar, menu, objects_panel, sliders)
+    Controller(data, root, image_panel, statusbar, menu, objects_panel, sliders, imglist_panel)
     root.mainloop()
 
 
