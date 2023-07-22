@@ -137,7 +137,7 @@ def prepare_colors(n_objects: int, shuffle: bool = True) -> list:
 def get_categories(instances: dict) -> dict:
     """Extracts categories from annotations file and prepares color for each one."""
     # Parse categories
-    colors = prepare_colors(n_objects=80, shuffle=True)
+    colors = prepare_colors(n_objects=len(instances["categories"]), shuffle=True)
     categories = list(
         zip(
             [[category["id"], category["name"]] for category in instances["categories"]],
