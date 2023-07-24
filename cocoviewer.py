@@ -511,7 +511,7 @@ class ImagelistPanel(ttk.PanedWindow):
         # image list controller
         scrollbar = tk.Scrollbar(self.imglist_subpanel)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.imglist_box = tk.Listbox(self.imglist_subpanel, selectmode=tk.EXTENDED, exportselection=0,yscrollcommand=scrollbar.set)
+        self.imglist_box = tk.Listbox(self.imglist_subpanel, selectmode=tk.SINGLE, exportselection=0,yscrollcommand=scrollbar.set)
         scrollbar.config(command=self.imglist_box.yview)
         self.imglist_box.pack(side=tk.TOP, fill=tk.Y, expand=True)
         self.add(self.imglist_subpanel)
@@ -721,18 +721,20 @@ class Controller:
         self.root.quit()
 
     def next_img(self, event=None):
-        self.data.next_image()
-        self.set_locals()
-        self.selected_cats = None
-        self.selected_objs = None
-        self.update_img(local=False)
+        cur_id = self.imglist_panel.imglist_box.index('active')
+        cur_id = min(self.imglist_panel.imglist_box.size() - 1,cur_id+1)
+        self.imglist_panel.imglist_box.selection_clear(0, tk.END)
+        self.imglist_panel.imglist_box.activate(cur_id)
+        self.imglist_panel.imglist_box.selection_set(cur_id)
+        self.select_img(None)
 
     def prev_img(self, event=None):
-        self.data.previous_image()
-        self.set_locals()
-        self.selected_cats = None
-        self.selected_objs = None
-        self.update_img(local=False)
+        cur_id = self.imglist_panel.imglist_box.index('active')
+        cur_id = max(0,cur_id-1)
+        self.imglist_panel.imglist_box.selection_clear(0, tk.END)
+        self.imglist_panel.imglist_box.activate(cur_id)
+        self.imglist_panel.imglist_box.selection_set(cur_id)
+        self.select_img(None)
 
     def save_image(self, event=None):
         """Saves composed image as png file."""
