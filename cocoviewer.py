@@ -20,16 +20,12 @@ from PIL import Image, ImageDraw, ImageFont, ImageTk
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 parser = argparse.ArgumentParser(description="View images with bboxes from the COCO dataset")
-parser.add_argument("-i", "--images", default="", type=str, metavar="PATH", help="path to images folder")
 parser.add_argument(
-    "-a",
-    "--annotations",
-    default="",
+    "annotations",
     type=str,
-    metavar="PATH",
     help="path to annotations json file",
 )
-
+parser.add_argument("imagedir", default="./",nargs='?', type=str, help="path to images folder")
 
 class Data:
     """Handles data related stuff."""
@@ -928,16 +924,10 @@ def main():
     root = tk.Tk()
     root.title("COCO Viewer")
     # Set the window icon
-    icon_path = os.path.dirname(os.readlink(__file__))+'/coco_viewer.png'
+    icon_path = os.path.dirname(os.path.realpath(__file__))+'/coco_viewer.png'
     root.iconphoto(True, tk.PhotoImage(file=icon_path))
-    if not args.images or not args.annotations:
-        root.geometry("300x150")  # app size when no data is provided
-        messagebox.showwarning("Warning!", "Nothing to show.\nPlease specify a path to the COCO dataset!")
-        print_info("Exiting...")
-        root.destroy()
-        return
 
-    data = Data(args.images, args.annotations)
+    data = Data(args.imagedir, args.annotations)
     statusbar = StatusBar(root)
     sliders = SlidersBar(root)
     objects_panel = ObjectsPanel(root)
