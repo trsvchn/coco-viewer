@@ -225,14 +225,44 @@ def draw_masks(draw, objects, obj_categories, ignore, alpha):
 
 def rle_to_mask(rle, height, width):
     rows, cols = height, width
-    rle_pairs = np.array(rle).reshape(-1, 2)
     img = np.zeros(rows * cols, dtype=np.uint8)
     index_offset = 0
+    
+    if type(rle) == str:
+        m = 0
+        p = 0
+        k = 0
+        str_len = len(rle)
+        cnts= [0] * str_len
+        while p < str_len:
+            x=0
+            k=0
+            more=1
+            while more != 0 :
+                c= ord(rle[p]) - 48
+                x |= ((c & 0x1f) << (5*k))
+                more = c & 0x20
+                p+=1
+                k+=1
+                if p >= str_len-1:
+                    break
+                if more == 0 and (c & 0x10 != 0): 
+                    x |= -1 << 5*k
+     
+            if(m>2) :
+                x += cnts[m-2]
+            cnts[m]=x
 
-    for index, length in rle_pairs:
-        index_offset += index
-        img[index_offset : index_offset + length] = 255
-        index_offset += length
+            if m%2 == 1:
+                img[index_offset : index_offset + x] = 255
+            index_offset+=x
+            m+=1
+    else:
+        rle_pairs = np.array(rle).reshape(-1, 2)
+        for index, length in rle_pairs:
+            index_offset += index
+            img[index_offset : index_offset + length] = 255
+            index_offset += length
 
     img = img.reshape(cols, rows)
     img = img.T
