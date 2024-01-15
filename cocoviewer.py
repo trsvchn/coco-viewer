@@ -536,7 +536,7 @@ class Controller:
         self.labels_on_global = tk.BooleanVar()  # Toggles category labels
         self.labels_on_global.set(True)
         self.masks_on_global = tk.BooleanVar()  # Toggles masks globally
-        self.masks_on_global.set(True)
+        self.masks_on_global.set(False)
         self.coloring_on_global = tk.BooleanVar()  # Toggles objects/categories coloring
         self.coloring_on_global.set(False)  # False for categories (defaults), True for objects
         # Menu Configuration
