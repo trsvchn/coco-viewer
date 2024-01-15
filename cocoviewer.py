@@ -180,7 +180,9 @@ def draw_bboxes(draw, objects, labels, obj_categories, ignore, width, label_size
                     # TODO: Implement notification message as popup window
                     font = ImageFont.load_default()
 
-                tw, th = draw.textsize(text, font)
+                # use pillow==9.5.0
+                tw, th = font.getsize(text)
+
                 tx0 = b[0]
                 ty0 = b[1] - th
 
@@ -534,7 +536,7 @@ class Controller:
         self.labels_on_global = tk.BooleanVar()  # Toggles category labels
         self.labels_on_global.set(True)
         self.masks_on_global = tk.BooleanVar()  # Toggles masks globally
-        self.masks_on_global.set(True)
+        self.masks_on_global.set(False)
         self.coloring_on_global = tk.BooleanVar()  # Toggles objects/categories coloring
         self.coloring_on_global.set(False)  # False for categories (defaults), True for objects
         # Menu Configuration
